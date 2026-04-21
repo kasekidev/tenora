@@ -51,8 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async login(email, password) {
       setLoading(true);
       try {
-        await authApi.login({ email, password });
-        await fetchMe();
+        const res = await authApi.login({ email, password });
+        // Si l'API renvoie le user, on l'enregistre direct
+        if (res.data) {
+          setUserState(res.data);
+        } else {
+          await fetchMe(); 
+        }
       } finally {
         setLoading(false);
       }

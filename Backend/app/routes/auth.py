@@ -120,7 +120,7 @@ def login(data: UserLogin, response: Response, request: Request, db: Session = D
     )
 
     logger.success(f"Connexion réussie | email={data.email} | id={user.id}")
-    return {"message": "Connecté"}
+    return user
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────

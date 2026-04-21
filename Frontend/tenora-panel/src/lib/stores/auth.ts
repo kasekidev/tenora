@@ -26,8 +26,10 @@ export const useAuthStore = create<AuthState>()(
       ready: false,
 
       login: async (email, password) => {
-        await api.post("/auth/login", { email, password });
-        const { data: me } = await api.get("/auth/me");
+        // ✅ FIX : /auth/login retourne déjà l'utilisateur directement —
+        // pas besoin d'un second appel /auth/me qui arrive avant que le
+        // cookie soit transmis par le navigateur et throw un 401 fantôme.
+        const { data: me } = await api.post("/auth/login", { email, password });
         if (!me.is_admin) {
           await api.post("/auth/logout").catch(() => {});
           throw new Error("Acces reserve aux administrateurs.");
