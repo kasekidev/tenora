@@ -1,0 +1,51 @@
+import { NavLink } from "react-router-dom";
+import { Home, ShoppingBag, Package, User, BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+
+const tabs = [
+  { to: "/", label: "Home", icon: Home, end: true },
+  { to: "/boutique", label: "Shop", icon: ShoppingBag },
+  { to: "/ebooks", label: "Ebooks", icon: BookOpen },
+];
+
+export function MobileTabBar() {
+  const { user } = useAuth();
+  const all = [
+    ...tabs,
+    user
+      ? { to: "/mes-commandes", label: "Cmd", icon: Package }
+      : { to: "/connexion", label: "Login", icon: User },
+    { to: user ? "/profil" : "/inscription", label: user ? "Profil" : "Join", icon: User },
+  ];
+
+  return (
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background/95 backdrop-blur-xl border-t-2 border-border pb-safe">
+      <div className="grid grid-cols-5">
+        {all.map((t) => (
+          <NavLink
+            key={t.to + t.label}
+            to={t.to}
+            end={(t as { end?: boolean }).end}
+            className={({ isActive }) =>
+              cn(
+                "relative flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors",
+                isActive ? "text-primary" : "text-muted-foreground"
+              )
+            }
+          >
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <span className="absolute top-0 left-2 right-2 h-0.5 bg-primary" />
+                )}
+                <t.icon className={cn("size-5", isActive && "drop-shadow-[0_0_8px_hsl(var(--primary))]")} />
+                <span>{t.label}</span>
+              </>
+            )}
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  );
+}

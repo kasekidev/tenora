@@ -1,0 +1,250 @@
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models.user import User
+from app.models.session import Session as SessionModel
+from app.models.otp import OTPCode
+from app.schemas.user import UserRegister, UserLogin, UserResponse, UserUpdate
+from app.config import settings
+from app.dependencies import get_current_user
+from app.services.rate_limiter import limiter
+from app.services.mail_service import send_otp_email
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from loguru import logger
+import secrets
+import random
+
+router = APIRouter()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+is_dev = settings.ENVIRONMENT == "dev"
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _send_otp(user: User, db: Session) -> None:
+    code      = str(random.randint(100000, 999999))
+    code_hash = pwd_context.hash(code)
+
+    # Invalider les anciens OTP non utilisés
+    db.query(OTPCode).filter(
+        OTPCode.user_id == user.id,
+        OTPCode.used    == False
+    ).update({"used": True})
+
+    otp = OTPCode(
+        user_id    = user.id,
+        code_hash  = code_hash,
+        expires_at = datetime.utcnow() + timedelta(minutes=10),
+    )
+    db.add(otp)
+    db.commit()
+
+    send_otp_email(user.email, code)
+
+
+def _purge_expired_sessions(db: Session) -> None:
+    """Supprime les sessions expirées — appelé à la connexion pour éviter l'accumulation."""
+    db.query(SessionModel).filter(
+        SessionModel.expires_at <= datetime.utcnow()
+    ).delete(synchronize_session=False)
+    db.commit()
+
+
+# ── Register ──────────────────────────────────────────────────────────────────
+
+@router.post("/register", response_model=UserResponse)
+@limiter.limit("5/minute")
+def register(data: UserRegister, request: Request, db: Session = Depends(get_db)):
+    logger.info(f"Tentative d'inscription | email={data.email} | ip={request.client.host}")
+
+    existing = db.query(User).filter(User.email == data.email).first()
+    if existing:
+        logger.warning(f"Inscription échouée | email déjà utilisé | email={data.email}")
+        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
+
+    hashed = pwd_context.hash(data.password)
+    user   = User(
+        email         = data.email,
+        password_hash = hashed,
+        phone         = data.phone,
+        is_verified   = False,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    try:
+        _send_otp(user, db)
+    except Exception as e:
+        # L'inscription réussit même si l'email OTP échoue — le user peut renvoyer
+        logger.error(f"Échec envoi OTP à l'inscription | user_id={user.id} | {e}")
+
+    logger.success(f"Inscription réussie | email={data.email} | id={user.id}")
+    return user
+
+
+# ── Login ─────────────────────────────────────────────────────────────────────
+
+@router.post("/login")
+@limiter.limit("10/minute")
+def login(data: UserLogin, response: Response, request: Request, db: Session = Depends(get_db)):
+    logger.info(f"Tentative de connexion | email={data.email} | ip={request.client.host}")
+
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user or not pwd_context.verify(data.password, user.password_hash):
+        logger.warning(f"Connexion échouée | email={data.email} | ip={request.client.host}")
+        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
+
+    # Purger les sessions expirées au moment de la connexion (pas de job dédié nécessaire)
+    try:
+        _purge_expired_sessions(db)
+    except Exception:
+        pass  # Non bloquant
+
+    session_id = secrets.token_hex(32)
+    session    = SessionModel(
+        id         = session_id,
+        user_id    = user.id,
+        expires_at = datetime.utcnow() + timedelta(days=7),
+    )
+    db.add(session)
+    db.commit()
+
+    response.set_cookie(
+    key      = "session_id",
+    value    = session_id,
+    httponly = True,
+    secure   = True,            
+    samesite = "lax" if is_dev else "none",          
+    max_age  = 604800,
+    )
+
+    logger.success(f"Connexion réussie | email={data.email} | id={user.id}")
+    return {"message": "Connecté"}
+
+
+# ── Logout ────────────────────────────────────────────────────────────────────
+
+@router.post("/logout")
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    session_id = request.cookies.get("session_id")
+    if session_id:
+        session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+        if session:
+            logger.info(f"Déconnexion | user_id={session.user_id} | ip={request.client.host}")
+        db.query(SessionModel).filter(SessionModel.id == session_id).delete()
+        db.commit()
+    else:
+        logger.warning(f"Déconnexion sans session active | ip={request.client.host}")
+
+    response.delete_cookie(
+    key      = "session_id",
+    secure   = True,
+    samesite = "none",
+    httponly = True,
+    )
+
+
+    return {"message": "Déconnecté"}
+
+
+# ── Me ────────────────────────────────────────────────────────────────────────
+
+@router.get("/me", response_model=UserResponse)
+def me(request: Request, db: Session = Depends(get_db)):
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Non connecté.")
+
+    session = db.query(SessionModel).filter(
+        SessionModel.id         == session_id,
+        SessionModel.expires_at >  datetime.utcnow(),
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Session expirée, veuillez vous reconnecter.")
+
+    # ✅ FIX : guard sur user None (session orpheline)
+    user = db.query(User).filter(User.id == session.user_id).first()
+    if not user:
+        logger.error(f"Session orpheline détectée | session_id={session_id} | user_id={session.user_id}")
+        db.query(SessionModel).filter(SessionModel.id == session_id).delete()
+        db.commit()
+        raise HTTPException(status_code=401, detail="Compte introuvable. Veuillez vous reconnecter.")
+
+    logger.info(f"Accès /me | user_id={user.id} | email={user.email}")
+    return user
+
+
+# ── Verify email ──────────────────────────────────────────────────────────────
+
+@router.post("/verify-email")
+@limiter.limit("5/minute")
+def verify_email(
+    request: Request,
+    code: str = Query(...),
+    db: Session   = Depends(get_db),
+    user: User    = Depends(get_current_user),
+):
+    if user.is_verified:
+        return {"message": "Email déjà vérifié."}
+
+    otp = db.query(OTPCode).filter(
+        OTPCode.user_id    == user.id,
+        OTPCode.used       == False,
+        OTPCode.expires_at >  datetime.utcnow(),
+    ).first()
+
+    if not otp:
+        logger.warning(f"Vérification OTP échouée | code expiré ou introuvable | user_id={user.id}")
+        raise HTTPException(status_code=400, detail="Code expiré ou invalide. Demandez un nouveau code.")
+
+    if not pwd_context.verify(code, otp.code_hash):
+        logger.warning(f"Vérification OTP échouée | mauvais code | user_id={user.id}")
+        raise HTTPException(status_code=400, detail="Code incorrect.")
+
+    otp.used        = True
+    user.is_verified = True
+    db.commit()
+
+    logger.success(f"Email vérifié | user_id={user.id} | email={user.email}")
+    return {"message": "Email vérifié avec succès."}
+
+
+# ── Resend OTP ────────────────────────────────────────────────────────────────
+
+@router.post("/resend-otp")
+@limiter.limit("3/minute")
+def resend_otp(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User  = Depends(get_current_user),
+):
+    if user.is_verified:
+        return {"message": "Email déjà vérifié."}
+
+    try:
+        _send_otp(user, db)
+    except Exception as e:
+        logger.error(f"Échec renvoi OTP | user_id={user.id} | {e}")
+        raise HTTPException(status_code=500, detail="Impossible d'envoyer le code. Réessayez dans quelques instants.")
+
+    logger.info(f"OTP renvoyé | user_id={user.id} | email={user.email}")
+    return {"message": "Code renvoyé, vérifiez votre boîte mail."}
+
+
+# ── Update profile ────────────────────────────────────────────────────────────
+
+@router.put("/profile", response_model=UserResponse)
+def update_profile(
+    data: UserUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User  = Depends(get_current_user),
+):
+    if data.phone is not None:
+        user.phone = data.phone
+        db.commit()
+        db.refresh(user)
+        logger.info(f"Profil mis à jour | user_id={user.id}")
+
+    return user
