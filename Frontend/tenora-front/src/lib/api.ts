@@ -45,9 +45,14 @@ api.interceptors.response.use(
 
     if (status === 401) {
       const url = error.config?.url || "";
-      const isAuthMe = url.includes("/auth/me");
-      _onUnauthorized?.();
-      if (!isAuthMe && current !== "/connexion" && current !== "/inscription") {
+      const isAuthEndpoint =
+        url.includes("/auth/me") ||
+        url.includes("/auth/login") ||
+        url.includes("/auth/register");
+      // Ne wipe la session QUE si le 401 vient d'un endpoint proteg ,
+      // pas d'un echec de login/register (sinon faux positif "session expiree").
+      if (!isAuthEndpoint) _onUnauthorized?.();
+      if (!isAuthEndpoint && current !== "/connexion" && current !== "/inscription") {
         window.location.href = `/connexion?redirect=${encodeURIComponent(current)}`;
       }
       return Promise.reject(error);
@@ -163,7 +168,7 @@ export interface SiteInit {
 export const authApi = {
   register: (data: { email: string; password: string; phone?: string }) =>
     api.post<User>("/auth/register", data),
-  login: (data: { email: string; password: string }) => api.post("/auth/login", data),
+  login: (data: { email: string; password: string }) => api.post<User>("/auth/login", data),
   logout: () => api.post("/auth/logout"),
   me: () => api.get<User>("/auth/me"),
   verifyEmail: (code: string) => api.post("/auth/verify-email", null, { params: { code } }),

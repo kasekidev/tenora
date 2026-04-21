@@ -31,8 +31,14 @@ export default function Login() {
       toast.success("Bienvenue admin");
       navigate("/", { replace: true });
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || "Identifiants invalides";
-      setError(typeof msg === "string" ? msg : "Erreur de connexion");
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+      let msg: string;
+      if (status === 401) msg = typeof detail === "string" ? detail : "Email ou mot de passe incorrect.";
+      else if (err?.message?.includes("administrateurs")) msg = err.message;
+      else if (err?.code === "ERR_NETWORK") msg = "Impossible de joindre l'API. Verifiez VITE_API_URL et la config CORS.";
+      else msg = typeof detail === "string" ? detail : (err?.message || "Erreur de connexion");
+      setError(msg);
     } finally {
       setLoading(false);
     }
