@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ordersApi, formatXOF, type Order } from "@/lib/api";
+import {
+  ordersApi,
+  importsApi,
+  formatXOF,
+  type Order,
+  type ImportRequest,
+} from "@/lib/api";
 import {
   Package,
   Clock,
@@ -14,6 +20,8 @@ import {
   Receipt,
   Wallet,
   Hash,
+  Truck,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -28,18 +36,47 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type StatusKey = Order["status"];
+// ── Type unifié : commande "produit" OU demande "import" ─────────────────────
+// On normalise les deux flux (Order + ImportRequest) côté front pour qu'ils
+// apparaissent ensemble dans "Mes commandes". Le backend reste inchangé.
+type UnifiedStatus = "pending" | "processing" | "completed" | "rejected" | "refunded";
 
-const STATUS: Record<StatusKey, { label: string; dot: string; chip: string; icon: any }> = {
-  pending:    { label: "En attente",    dot: "bg-warning",     chip: "bg-warning/10 text-warning border-warning/30",         icon: Clock },
-  processing: { label: "En traitement", dot: "bg-secondary",   chip: "bg-secondary/10 text-secondary border-secondary/30",   icon: Loader2 },
-  completed:  { label: "Livrée",        dot: "bg-success",     chip: "bg-success/10 text-success border-success/30",         icon: CheckCircle2 },
-  rejected:   { label: "Rejetée",       dot: "bg-destructive", chip: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
-  refunded:   { label: "Remboursée",    dot: "bg-muted-foreground", chip: "bg-muted text-muted-foreground border-border",    icon: RefreshCcw },
+type UnifiedOrder = {
+  uid: string;            // clé unique cross-source ("o-12" / "i-7")
+  kind: "order" | "import";
+  id: number;
+  status: UnifiedStatus;
+  created_at: string;
+  total_price: number;    // 0 pour les imports (devis ultérieur)
+  quantity: number;
+  payment_method: string | null;
+  staff_note: string | null;
+  // Données spécifiques
+  product_id?: number;            // order
+  import_url?: string;            // import
+  import_whatsapp?: string;       // import
 };
 
-const FILTERS: { key: "all" | StatusKey; label: string }[] = [
+// Mapping des statuts d'import vers le set unifié
+const IMPORT_STATUS_MAP: Record<ImportRequest["status"], UnifiedStatus> = {
+  pending:     "pending",
+  contacted:   "processing",
+  in_progress: "processing",
+  delivered:   "completed",
+  cancelled:   "rejected",
+};
+
+const STATUS: Record<UnifiedStatus, { label: string; dot: string; chip: string; icon: any }> = {
+  pending:    { label: "En attente",    dot: "bg-warning",          chip: "bg-warning/10 text-warning border-warning/30",                 icon: Clock },
+  processing: { label: "En traitement", dot: "bg-secondary",        chip: "bg-secondary/10 text-secondary border-secondary/30",           icon: Loader2 },
+  completed:  { label: "Livrée",        dot: "bg-success",          chip: "bg-success/10 text-success border-success/30",                 icon: CheckCircle2 },
+  rejected:   { label: "Rejetée",       dot: "bg-destructive",      chip: "bg-destructive/10 text-destructive border-destructive/30",     icon: XCircle },
+  refunded:   { label: "Remboursée",    dot: "bg-muted-foreground", chip: "bg-muted text-muted-foreground border-border",                 icon: RefreshCcw },
+};
+
+const FILTERS: { key: "all" | UnifiedStatus | "import"; label: string }[] = [
   { key: "all",        label: "Toutes" },
+  { key: "import",     label: "Imports" },
   { key: "pending",    label: "En attente" },
   { key: "processing", label: "En cours" },
   { key: "completed",  label: "Livrées" },
@@ -59,14 +96,59 @@ function timeAgo(iso: string) {
 
 export default function Orders() {
   const qc = useQueryClient();
-  const { data: orders = [], isLoading, refetch, isRefetching } = useQuery({
+
+  // Deux fetchs en parallèle : commandes produits + demandes d'import
+  const ordersQ = useQuery({
     queryKey: ["orders", "my"],
     queryFn: () => ordersApi.myOrders().then((r) => r.data),
   });
+  const importsQ = useQuery({
+    queryKey: ["imports", "my"],
+    queryFn: () => importsApi.myRequests().then((r) => r.data),
+  });
+
+  const isLoading = ordersQ.isLoading || importsQ.isLoading;
+  const isRefetching = ordersQ.isRefetching || importsQ.isRefetching;
+  const refetchAll = () => {
+    ordersQ.refetch();
+    importsQ.refetch();
+  };
+
+  // Fusion + normalisation
+  const unified: UnifiedOrder[] = useMemo(() => {
+    const fromOrders: UnifiedOrder[] = (ordersQ.data || []).map((o) => ({
+      uid: `o-${o.id}`,
+      kind: "order",
+      id: o.id,
+      status: o.status,
+      created_at: o.created_at,
+      total_price: o.total_price,
+      quantity: o.quantity,
+      payment_method: o.payment_method,
+      staff_note: o.staff_note,
+      product_id: o.product_id,
+    }));
+    const fromImports: UnifiedOrder[] = (importsQ.data || []).map((i) => ({
+      uid: `i-${i.id}`,
+      kind: "import",
+      id: i.id,
+      status: IMPORT_STATUS_MAP[i.status],
+      created_at: i.created_at,
+      total_price: 0,
+      quantity: 1,
+      payment_method: null,
+      staff_note: i.staff_note,
+      import_url: i.article_url,
+      import_whatsapp: importsApi.getWhatsappLink(i.id),
+    }));
+    return [...fromOrders, ...fromImports].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }, [ordersQ.data, importsQ.data]);
 
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const [search, setSearch] = useState("");
-  const [confirmCancel, setConfirmCancel] = useState<Order | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<UnifiedOrder | null>(null);
 
   const cancelMutation = useMutation({
     mutationFn: (id: number) => ordersApi.cancel(id),
@@ -82,25 +164,30 @@ export default function Orders() {
   });
 
   const stats = useMemo(() => {
-    const total = orders.length;
-    const spent = orders
+    const total = unified.length;
+    const spent = unified
       .filter((o) => o.status !== "rejected" && o.status !== "refunded")
       .reduce((s, o) => s + o.total_price, 0);
-    const pending = orders.filter((o) => o.status === "pending" || o.status === "processing").length;
-    const completed = orders.filter((o) => o.status === "completed").length;
+    const pending = unified.filter((o) => o.status === "pending" || o.status === "processing").length;
+    const completed = unified.filter((o) => o.status === "completed").length;
     return { total, spent, pending, completed };
-  }, [orders]);
+  }, [unified]);
 
   const filtered = useMemo(() => {
-    return orders.filter((o) => {
-      if (filter !== "all" && o.status !== filter) return false;
+    return unified.filter((o) => {
+      if (filter === "import") {
+        if (o.kind !== "import") return false;
+      } else if (filter !== "all" && o.status !== filter) {
+        return false;
+      }
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        if (!String(o.id).includes(q) && !(o.payment_method || "").toLowerCase().includes(q)) return false;
+        const haystack = `${o.id} ${o.payment_method || ""} ${o.import_url || ""} ${o.kind}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [orders, filter, search]);
+  }, [unified, filter, search]);
 
   return (
     <div className="container-app py-8 md:py-12 max-w-5xl">
@@ -112,7 +199,7 @@ export default function Orders() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetch()}
+            onClick={refetchAll}
             disabled={isRefetching}
             className="border-2 uppercase tracking-wider text-xs font-bold"
           >
@@ -123,7 +210,7 @@ export default function Orders() {
       </div>
 
       {/* Stats */}
-      {!isLoading && orders.length > 0 && (
+      {!isLoading && unified.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
           <StatCard icon={Receipt}      label="Total"     value={String(stats.total)} />
           <StatCard icon={Clock}        label="En cours"  value={String(stats.pending)} accent="warning" />
@@ -139,24 +226,29 @@ export default function Orders() {
             <div key={i} className="h-32 bg-muted animate-pulse border-2 border-border" />
           ))}
         </div>
-      ) : orders.length === 0 ? (
+      ) : unified.length === 0 ? (
         <EmptyState />
       ) : (
         <>
-          {/* Toolbar : recherche + filtres */}
+          {/* Toolbar */}
           <div className="flex flex-col md:flex-row gap-3 mb-5">
             <div className="relative md:max-w-xs flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher #ID, paiement…"
+                placeholder="Rechercher #ID, paiement, import…"
                 className="w-full h-11 pl-10 pr-3 bg-input border-2 border-border text-sm font-medium focus:outline-none focus:border-primary transition-colors"
               />
             </div>
             <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 md:flex-wrap md:overflow-visible">
               {FILTERS.map((f) => {
-                const count = f.key === "all" ? orders.length : orders.filter((o) => o.status === f.key).length;
+                const count =
+                  f.key === "all"
+                    ? unified.length
+                    : f.key === "import"
+                    ? unified.filter((o) => o.kind === "import").length
+                    : unified.filter((o) => o.status === f.key).length;
                 const active = filter === f.key;
                 return (
                   <button
@@ -189,18 +281,16 @@ export default function Orders() {
               {filtered.map((o) => {
                 const s = STATUS[o.status];
                 const Icon = s.icon;
-                const normalizedStatus = o.status?.toLowerCase?.();
-                const canCancel = normalizedStatus === "pending" || normalizedStatus === "processing";
+                const canCancel = o.kind === "order" && (o.status === "pending" || o.status === "processing");
+                const isImport = o.kind === "import";
                 return (
                   <article
-                    key={o.id}
+                    key={o.uid}
                     className="group relative bg-card border-2 border-border hover:border-foreground/40 transition-all"
                   >
-                    {/* Bandeau statut */}
                     <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${s.dot}`} aria-hidden />
 
                     <div className="p-4 md:p-5 pl-5 md:pl-7">
-                      {/* Top */}
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-widest">
@@ -208,25 +298,42 @@ export default function Orders() {
                             <span>{String(o.id).padStart(5, "0")}</span>
                             <span>·</span>
                             <span>{timeAgo(o.created_at)}</span>
+                            {isImport && (
+                              <>
+                                <span>·</span>
+                                <span className="inline-flex items-center gap-1 text-accent">
+                                  <Truck className="size-3" /> Import
+                                </span>
+                              </>
+                            )}
                           </div>
                           <p className="font-display font-bold text-xl mt-1">
-                            Commande #{o.id}
+                            {isImport ? `Demande d'import #${o.id}` : `Commande #${o.id}`}
                           </p>
                         </div>
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 border text-[11px] font-bold uppercase tracking-wider ${s.chip}`}>
-                          <Icon className={`size-3 ${normalizedStatus === "processing" ? "animate-spin" : ""}`} /> {s.label}
+                          <Icon className={`size-3 ${o.status === "processing" ? "animate-spin" : ""}`} /> {s.label}
                         </span>
                       </div>
 
-                      {/* Meta grid */}
                       <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                        <Meta label="Quantité"  value={String(o.quantity)} />
-                        <Meta label="Paiement"  value={o.payment_method || "—"} />
-                        <Meta label="Date"      value={new Date(o.created_at).toLocaleDateString("fr-FR")} />
-                        <Meta label="Total"     value={formatXOF(o.total_price)} highlight />
+                        {isImport ? (
+                          <>
+                            <Meta label="Type"     value="Import" />
+                            <Meta label="Lien"     value={truncate(o.import_url || "", 28)} />
+                            <Meta label="Date"     value={new Date(o.created_at).toLocaleDateString("fr-FR")} />
+                            <Meta label="Total"    value="Sur devis" highlight />
+                          </>
+                        ) : (
+                          <>
+                            <Meta label="Quantité" value={String(o.quantity)} />
+                            <Meta label="Paiement" value={o.payment_method || "—"} />
+                            <Meta label="Date"     value={new Date(o.created_at).toLocaleDateString("fr-FR")} />
+                            <Meta label="Total"    value={formatXOF(o.total_price)} highlight />
+                          </>
+                        )}
                       </div>
 
-                      {/* Note staff */}
                       {o.staff_note && (
                         <div className="mt-4 border-l-2 border-secondary pl-3 py-2 bg-secondary/5">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-1">Note de l'équipe</p>
@@ -234,20 +341,38 @@ export default function Orders() {
                         </div>
                       )}
 
-                      {/* Actions */}
                       <div className="mt-4 flex flex-wrap items-center gap-2 pt-4 border-t border-border">
-                        <Button asChild variant="outline" size="sm" className="border-2 text-xs font-bold uppercase tracking-wider">
-                          <Link to={`/produit/${o.product_id}`}>Voir le produit</Link>
-                        </Button>
-                        {canCancel && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setConfirmCancel(o)}
-                            className="border-2 border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:border-destructive text-xs font-bold uppercase tracking-wider"
-                          >
-                            <XCircle className="size-4" /> Annuler
-                          </Button>
+                        {isImport ? (
+                          <>
+                            {o.import_url && (
+                              <Button asChild variant="outline" size="sm" className="border-2 text-xs font-bold uppercase tracking-wider">
+                                <a href={o.import_url} target="_blank" rel="noopener noreferrer">Voir l'article</a>
+                              </Button>
+                            )}
+                            {o.import_whatsapp && (
+                              <Button asChild size="sm" className="bg-whatsapp text-whatsapp-foreground hover:opacity-90 text-xs font-bold uppercase tracking-wider">
+                                <a href={o.import_whatsapp} target="_blank" rel="noopener noreferrer">
+                                  <MessageCircle className="size-4" /> WhatsApp
+                                </a>
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <Button asChild variant="outline" size="sm" className="border-2 text-xs font-bold uppercase tracking-wider">
+                              <Link to={`/produit/${o.product_id}`}>Voir le produit</Link>
+                            </Button>
+                            {canCancel && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setConfirmCancel(o)}
+                                className="border-2 border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground hover:border-destructive text-xs font-bold uppercase tracking-wider"
+                              >
+                                <XCircle className="size-4" /> Annuler
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -259,7 +384,6 @@ export default function Orders() {
         </>
       )}
 
-      {/* Confirmation annulation */}
       <AlertDialog open={!!confirmCancel} onOpenChange={(o) => !o && setConfirmCancel(null)}>
         <AlertDialogContent className="border-2">
           <AlertDialogHeader>
@@ -284,6 +408,10 @@ export default function Orders() {
       </AlertDialog>
     </div>
   );
+}
+
+function truncate(s: string, n: number) {
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
 function StatCard({

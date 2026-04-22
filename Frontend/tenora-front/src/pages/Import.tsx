@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { importsApi, productsApi, type CategoryTree } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -10,21 +10,23 @@ export default function ImportPage() {
   const { data: site } = useSite();
   const wa = site?.whatsapp_number?.replace(/\D/g, "") || "";
 
+  // ── Catégories : on ne garde QUE les sous-catégories du service `import_export`.
+  //    - On exclut les parents (Import, Ebooks, etc.) qui ne sont que des regroupements.
+  //    - On affiche directement "Shein", "Alibaba"… (pas de "Import › Shein").
   const { data: tree = [] } = useQuery({
     queryKey: ["categories", "tree"],
-    queryFn: () =>
-      productsApi.getCategoriesTree().then((r) =>
-        // Ne garder QUE les catégories d'import (service_type === "import_export")
-        // — les autres (gaming, streaming, ebooks…) ne sont pas concernées par
-        // la page Import. Le filtre inverse est appliqué dans Shop.tsx.
-        r.data.filter((c) => c.service_type === "import_export")
-      ),
+    queryFn: () => productsApi.getCategoriesTree().then((r) => r.data),
   });
-  // Flatten (parents + sub) pour le selecteur
-  const flat = tree.flatMap((c) => [
-    { id: c.id, name: c.name },
-    ...c.subcategories.map((s) => ({ id: s.id, name: `${c.name} › ${s.name}` })),
-  ]);
+
+  const importChoices = tree
+    .filter((c: CategoryTree) => c.service_type === "import_export")
+    .flatMap((c) =>
+      // Si le parent a des sous-catégories, on n'expose QUE les enfants.
+      // Sinon (catégorie d'import sans enfant), on expose le parent lui-même.
+      c.subcategories.length > 0
+        ? c.subcategories.map((s) => ({ id: s.id, name: s.name }))
+        : [{ id: c.id, name: c.name }]
+    );
 
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [url, setUrl] = useState("");
@@ -39,16 +41,32 @@ export default function ImportPage() {
     if (!url) return toast.error("Lien de l'article requis.");
     setLoading(true);
     try {
-      const r = await importsApi.create({ category_id: Number(categoryId), article_url: url, article_description: desc || undefined });
+      const r = await importsApi.create({
+        category_id: Number(categoryId),
+        article_url: url,
+        article_description: desc || undefined,
+      });
       if (file) await importsApi.uploadScreenshot(r.data.id, file);
       setCreatedId(r.data.id);
-      toast.success("Demande envoyée — nous vous contactons sur WhatsApp.");
+      toast.success("Demande envoyée — redirection vers WhatsApp…");
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || "Erreur lors de l'envoi.");
     } finally {
       setLoading(false);
     }
   };
+
+  // ── Redirection WhatsApp automatique juste après confirmation ─────────────
+  useEffect(() => {
+    if (createdId && wa) {
+      const link = importsApi.getWhatsappLink(createdId);
+      // Petit délai pour laisser voir l'écran de confirmation, puis redirection.
+      const t = setTimeout(() => {
+        window.location.href = link;
+      }, 1200);
+      return () => clearTimeout(t);
+    }
+  }, [createdId, wa]);
 
   if (createdId) {
     return (
@@ -58,7 +76,9 @@ export default function ImportPage() {
             <Check className="size-7" />
           </div>
           <h1 className="font-display text-2xl font-bold">Demande #{createdId} reçue</h1>
-          <p className="text-muted-foreground mt-2">Notre équipe vous contactera sur WhatsApp avec un devis.</p>
+          <p className="text-muted-foreground mt-2">
+            Vous allez être redirigé vers WhatsApp pour finaliser avec notre équipe.
+          </p>
           {wa && (
             <Button asChild className="mt-5 bg-whatsapp text-whatsapp-foreground hover:opacity-90">
               <a href={importsApi.getWhatsappLink(createdId)} target="_blank" rel="noopener">
@@ -74,10 +94,14 @@ export default function ImportPage() {
   return (
     <div className="container-app py-8 md:py-12 max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
-        <div className="size-12 rounded-2xl bg-accent/15 text-accent flex items-center justify-center"><Truck className="size-6" /></div>
+        <div className="size-12 rounded-2xl bg-accent/15 text-accent flex items-center justify-center">
+          <Truck className="size-6" />
+        </div>
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-bold">Demande d'import</h1>
-          <p className="text-sm text-muted-foreground">Shein, Alibaba, Amazon… commandez sans carte internationale.</p>
+          <p className="text-sm text-muted-foreground">
+            Shein, Alibaba, Amazon… commandez sans carte internationale.
+          </p>
         </div>
       </div>
 
@@ -90,28 +114,61 @@ export default function ImportPage() {
             className="mt-1 w-full h-11 px-3 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
           >
             <option value="">Choisir…</option>
-            {flat.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {importChoices.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
         </div>
         <div>
           <label className="text-xs font-medium text-muted-foreground">Lien de l'article</label>
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.shein.com/..." className="mt-1 w-full h-11 px-3 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://www.shein.com/..."
+            className="mt-1 w-full h-11 px-3 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+          />
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Description <span className="text-muted-foreground/70">(optionnel)</span></label>
-          <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Taille, couleur, quantité…" className="mt-1 w-full px-3 py-2 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+          <label className="text-xs font-medium text-muted-foreground">
+            Description <span className="text-muted-foreground/70">(optionnel)</span>
+          </label>
+          <textarea
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            rows={3}
+            placeholder="Taille, couleur, quantité…"
+            className="mt-1 w-full px-3 py-2 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+          />
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Capture d'écran <span className="text-muted-foreground/70">(optionnel)</span></label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Capture d'écran <span className="text-muted-foreground/70">(optionnel)</span>
+          </label>
           <div className="mt-1 relative">
-            <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
-            <div className={`border-2 border-dashed rounded-lg p-5 text-center ${file ? "border-primary bg-primary/5" : "border-border"}`}>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+            <div
+              className={`border-2 border-dashed rounded-lg p-5 text-center ${
+                file ? "border-primary bg-primary/5" : "border-border"
+              }`}
+            >
               <Upload className="size-5 mx-auto text-muted-foreground mb-1.5" />
               <p className="text-sm">{file ? file.name : "Ajouter une capture"}</p>
             </div>
           </div>
         </div>
-        <Button type="submit" disabled={loading} size="lg" className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow">
+        <Button
+          type="submit"
+          disabled={loading}
+          size="lg"
+          className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow"
+        >
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Truck className="size-4" />} Envoyer la demande
         </Button>
       </form>
