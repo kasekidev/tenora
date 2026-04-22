@@ -13,7 +13,12 @@ export default function Shop() {
   const [debounced, setDebounced] = useState("");
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
-  const scrollPaneClass = "min-h-0 h-full overflow-y-auto overscroll-contain [overscroll-behavior:contain] [touch-action:pan-y]";
+  // IMPORTANT — on n'active le scroll interne (deux colonnes indépendantes)
+  // QUE sur desktop. Sur mobile, on laisse la page entière scroller
+  // naturellement, sinon le touch-action interne entre en conflit avec le
+  // scroll vertical du body et il faut viser les bords de l'écran.
+  const scrollPaneClass =
+    "md:min-h-0 md:h-full md:overflow-y-auto md:overscroll-contain md:[overscroll-behavior:contain] md:[touch-action:pan-y]";
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 280);
