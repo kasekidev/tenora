@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
+import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -182,3 +183,7 @@ app.include_router(imports_router,  prefix="/imports",  tags=["Import/Export"])
 app.include_router(ebooks_router,   prefix="/ebooks",   tags=["Ebooks"])
 app.include_router(site_router,                         tags=["Site"])
 app.include_router(panel_router,                        tags=["Admin Panel"])
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
