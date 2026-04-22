@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSite } from "@/context/SiteContext";
-import { Megaphone, Wrench, X } from "lucide-react";
+import { Megaphone, X } from "lucide-react";
 
 const STORAGE_KEY = "tenora.announcement.dismissed";
 
@@ -18,15 +18,9 @@ export function AnnouncementBar() {
 
   if (!data) return null;
 
-  // Maintenance : critique, JAMAIS dismissable.
-  if (data.maintenance) {
-    return (
-      <div className="bg-warning text-warning-foreground text-center text-[11px] sm:text-sm font-bold uppercase tracking-widest py-2 px-4 flex items-center justify-center gap-2 border-b-2 border-foreground/10 pt-safe">
-        <Wrench className="size-4 shrink-0" />
-        <span className="truncate">Site en maintenance — certaines fonctionnalités peuvent être indisponibles.</span>
-      </div>
-    );
-  }
+  // En mode maintenance, le MaintenanceGate prend le relais et remplace toute l'UI.
+  // On n'affiche donc rien ici (évite le double bandeau).
+  if (data.maintenance) return null;
 
   if (!data.announcement?.enabled || !data.announcement.text) return null;
 

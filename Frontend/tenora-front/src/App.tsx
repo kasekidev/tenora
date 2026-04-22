@@ -6,6 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { SiteProvider } from "@/context/SiteContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
+import { MaintenanceGate } from "@/components/layout/MaintenanceGate";
 
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
@@ -32,7 +33,8 @@ const App = () => (
         <AuthProvider>
           <SiteProvider>
             <Sonner position="top-center" richColors closeButton />
-            <Routes>
+            <MaintenanceGate>
+              <Routes>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Home />} />
                 <Route path="/boutique" element={<Shop />} />
@@ -76,7 +78,8 @@ const App = () => (
                 <Route path="/installer" element={<Install />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
-            </Routes>
+              </Routes>
+            </MaintenanceGate>
           </SiteProvider>
         </AuthProvider>
       </BrowserRouter>
