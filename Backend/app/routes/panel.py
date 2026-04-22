@@ -725,13 +725,21 @@ def list_imports(
     imports = q.order_by(ImportRequest.created_at.desc()).all()
     return [
         {
-            "id":         r.id,
-            "user_id":    r.user_id,
-            "user_email": r.user.email if r.user else None,
-            "details":    r.details,
-            "status":     r.status,
-            "staff_note": r.staff_note,
-            "created_at": r.created_at.isoformat(),
+            "id":                  r.id,
+            "user_id":             r.user_id,
+            "user_email":          r.user.email if r.user else None,
+            "user_name":           (getattr(r.user, "full_name", None) or getattr(r.user, "name", None)) if r.user else None,
+            "category_id":         r.category_id,
+            "article_url":         r.article_url,
+            "product_link":        r.article_url,            # alias frontend
+            "article_description": r.article_description,
+            "notes":               r.article_description,    # alias frontend
+            "screenshot_path":     r.screenshot_path,
+            "screenshot_url":      f"/uploads/{r.screenshot_path}" if r.screenshot_path else None,
+            "status":              r.status.value if hasattr(r.status, "value") else r.status,
+            "staff_note":          r.staff_note,
+            "created_at":          r.created_at.isoformat() if r.created_at else None,
+            "updated_at":          r.updated_at.isoformat() if r.updated_at else None,
         }
         for r in imports
     ]
