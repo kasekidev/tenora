@@ -101,22 +101,32 @@ def login(data: UserLogin, response: Response, request: Request, db: Session = D
     except Exception:
         pass  # Non bloquant
 
+    # ── Durée de session selon le rôle ────────────────────────────────────────
+    # Admin : 12h (logout total à expiration, pas de sliding window).
+    # User  : 7j (comportement historique inchangé).
+    if user.is_admin:
+        session_duration = timedelta(hours=12)
+        cookie_max_age   = 12 * 60 * 60          # 43 200 s
+    else:
+        session_duration = timedelta(days=7)
+        cookie_max_age   = 7 * 24 * 60 * 60      # 604 800 s
+
     session_id = secrets.token_hex(32)
     session    = SessionModel(
         id         = session_id,
         user_id    = user.id,
-        expires_at = datetime.utcnow() + timedelta(days=7),
+        expires_at = datetime.utcnow() + session_duration,
     )
     db.add(session)
     db.commit()
 
     response.set_cookie(
-    key      = "session_id",
-    value    = session_id,
-    httponly = True,
-    secure   = True,            
-    samesite = "lax" if is_dev else "none",          
-    max_age  = 604800,
+        key      = "session_id",
+        value    = session_id,
+        httponly = True,
+        secure   = True,
+        samesite = "lax" if is_dev else "none",
+        max_age  = cookie_max_age,
     )
 
     logger.success(f"Connexion réussie | email={data.email} | id={user.id}")
