@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Wrench, Megaphone, MessageCircle, CreditCard, AlertTriangle } from "lucide-react";
+import { Wrench, Megaphone, MessageCircle, CreditCard, AlertTriangle, Flame } from "lucide-react";
 import { PageHeader } from "@/components/panel/PageHeader";
 import { Skeleton } from "@/components/panel/PanelSkeletons";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/settings";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { FeaturedProductsManager } from "@/components/panel/FeaturedProductsManager";
 
 interface PM {
   key: string; label: string; desc: string;
@@ -109,6 +110,7 @@ export default function SettingsPage() {
             { v: "announcement", icon: Megaphone, label: "Bandeau" },
             { v: "whatsapp", icon: MessageCircle, label: "WhatsApp" },
             { v: "payments", icon: CreditCard, label: "Paiements" },
+            { v: "featured", icon: Flame, label: "Hot Now" },
           ].map(({ v, icon: I, label }) => (
             <TabsTrigger
               key={v} value={v}
@@ -232,6 +234,10 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="featured">
+          <FeaturedProductsManager />
         </TabsContent>
       </Tabs>
     </div>
