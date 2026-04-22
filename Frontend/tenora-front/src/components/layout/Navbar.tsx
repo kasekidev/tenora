@@ -24,8 +24,8 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-background/85 backdrop-blur-xl border-b-2 border-border">
-      <div className="container-app h-16 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 bg-background/95 md:bg-background/85 backdrop-blur-xl border-b-2 border-border">
+      <div className="container-app h-14 md:h-16 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2 shrink-0 group">
           <TenoraLogo className="text-2xl text-foreground group-hover:text-primary transition-colors" />
         </Link>

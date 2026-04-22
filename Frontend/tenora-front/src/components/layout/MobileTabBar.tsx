@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 const tabs = [
-  { to: "/", label: "Home", icon: Home, end: true },
+  { to: "/", label: "Accueil", icon: Home, end: true },
   { to: "/boutique", label: "Shop", icon: ShoppingBag },
   { to: "/ebooks", label: "Ebooks", icon: BookOpen },
 ];
@@ -20,7 +20,11 @@ export function MobileTabBar() {
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background/95 backdrop-blur-xl border-t-2 border-border pb-safe">
+    <nav
+      aria-label="Navigation principale"
+      className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background/95 backdrop-blur-xl border-t-2 border-border"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+    >
       <div className="grid grid-cols-5">
         {all.map((t) => (
           <NavLink
@@ -29,7 +33,9 @@ export function MobileTabBar() {
             end={(t as { end?: boolean }).end}
             className={({ isActive }) =>
               cn(
-                "relative flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors",
+                // min-h 56px = recommandation Android Material pour tap targets
+                "relative flex flex-col items-center justify-center gap-1 min-h-[56px] py-2 px-1 text-[10px] font-bold uppercase tracking-widest transition-colors",
+                "active:bg-muted/40",
                 isActive ? "text-primary" : "text-muted-foreground"
               )
             }
@@ -37,10 +43,15 @@ export function MobileTabBar() {
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <span className="absolute top-0 left-2 right-2 h-0.5 bg-primary" />
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary" />
                 )}
-                <t.icon className={cn("size-5", isActive && "drop-shadow-[0_0_8px_hsl(var(--primary))]")} />
-                <span>{t.label}</span>
+                <t.icon
+                  className={cn(
+                    "size-[22px] transition-transform",
+                    isActive && "scale-110 drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]"
+                  )}
+                />
+                <span className="truncate max-w-full leading-none">{t.label}</span>
               </>
             )}
           </NavLink>

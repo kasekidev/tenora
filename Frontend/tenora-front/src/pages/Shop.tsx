@@ -13,6 +13,7 @@ export default function Shop() {
   const [debounced, setDebounced] = useState("");
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  const scrollPaneClass = "min-h-0 h-full overflow-y-auto overscroll-contain [overscroll-behavior:contain] [touch-action:pan-y]";
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 280);
@@ -21,7 +22,11 @@ export default function Shop() {
 
   const { data: tree = [], isLoading: loadingCats } = useQuery({
     queryKey: ["categories", "tree"],
-    queryFn: () => productsApi.getCategoriesTree().then((r) => r.data),
+    queryFn: () =>
+      productsApi.getCategoriesTree().then((r) =>
+        // Exclure les catégories "import_export" — elles ont leur propre page /import.
+        r.data.filter((c) => c.service_type !== "import_export")
+      ),
   });
 
   const { data: products = [], isLoading: loadingProducts } = useQuery({
@@ -105,9 +110,9 @@ export default function Shop() {
   );
 
   return (
-    <div className="container-app py-6 md:py-10">
+    <div className="container-app py-6 md:py-8 md:h-[calc(100vh-4rem)] md:overflow-hidden md:flex md:flex-col">
       {/* Page header brutalist */}
-      <div className="mb-6 md:mb-8 border-b-2 border-border pb-5">
+      <div className="mb-6 md:mb-6 border-b-2 border-border pb-5 shrink-0">
         <p className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-2 font-mono">// Catalogue</p>
         <h1 className="font-display text-5xl md:text-7xl font-bold uppercase leading-none">{currentTitle}</h1>
         <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono mt-3">
@@ -115,16 +120,21 @@ export default function Shop() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-[260px_1fr] gap-6 lg:gap-10">
-        {/* Sidebar desktop */}
-        <aside className="hidden md:block">
-          <div className="sticky top-20">
-            <h2 className="font-display font-bold text-2xl uppercase mb-3">Catégories</h2>
-            {Sidebar}
-          </div>
+      {/*
+        Layout : deux colonnes avec scroll INDÉPENDANT.
+        - hauteur fixée au viewport (moins l'offset de la navbar/header)
+        - chaque colonne a son propre overflow-y-auto + overscroll-contain
+          → la molette ne "bubble" pas d'une colonne à l'autre ni vers la page.
+      */}
+      <div className="grid md:grid-cols-[260px_minmax(0,1fr)] gap-6 lg:gap-10 min-h-0 flex-1">
+        {/* Sidebar desktop : scroll local */}
+        <aside className={cn("hidden md:block pr-2 -mr-2", scrollPaneClass)}>
+          <h2 className="font-display font-bold text-2xl uppercase mb-3">Catégories</h2>
+          {Sidebar}
         </aside>
 
-        <main>
+        {/* Produits : scroll local */}
+        <main className={cn("min-h-0 md:pr-1", scrollPaneClass)}>
           {/* Topbar */}
           <div className="flex items-center gap-2 mb-5">
             <Sheet open={filterOpen} onOpenChange={setFilterOpen}>

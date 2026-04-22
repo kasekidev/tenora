@@ -12,10 +12,11 @@ export function AppLayout() {
   }, [pathname]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-dvh flex flex-col bg-background overflow-x-hidden px-safe">
       <AnnouncementBar />
       <Navbar />
-      <main className="flex-1 pb-20 md:pb-0">
+      {/* pb-24 mobile = espace pour la tab bar fixe (~64px) + safe area iOS/Android */}
+      <main className="flex-1 min-h-0 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
         <Outlet />
       </main>
       <Footer />

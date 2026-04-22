@@ -18,6 +18,7 @@ import Profile from "./pages/Profile";
 import Orders from "./pages/Orders";
 import ImportPage from "./pages/Import";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -72,6 +73,7 @@ const App = () => (
                   }
                 />
                 <Route path="/confirmation" element={<OrderConfirmation />} />
+                <Route path="/installer" element={<Install />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

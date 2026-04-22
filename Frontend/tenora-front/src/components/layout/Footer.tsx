@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { TenoraLogo } from "@/components/brand/TenoraLogo";
 import { useSite } from "@/context/SiteContext";
-import { MessageCircle, MapPin, Mail, ArrowUpRight } from "lucide-react";
+import { MessageCircle, MapPin, Mail, ArrowUpRight, Download } from "lucide-react";
 
 export function Footer() {
   const { data } = useSite();
@@ -34,6 +34,7 @@ export function Footer() {
             <li><Link to="/ebooks" className="hover:text-primary transition-colors inline-flex items-center gap-1">Ebooks <ArrowUpRight className="size-3.5" /></Link></li>
             <li><Link to="/import" className="hover:text-primary transition-colors inline-flex items-center gap-1">Import Shein <ArrowUpRight className="size-3.5" /></Link></li>
             <li><Link to="/mes-commandes" className="hover:text-primary transition-colors inline-flex items-center gap-1">Mes commandes <ArrowUpRight className="size-3.5" /></Link></li>
+            <li><Link to="/installer" className="hover:text-primary transition-colors inline-flex items-center gap-1"><Download className="size-3.5" /> Installer l'app</Link></li>
           </ul>
         </div>
         <div className="md:col-span-4">

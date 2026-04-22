@@ -128,7 +128,7 @@ export default function Home() {
             </span>
           </div>
 
-          <h1 className="font-display font-bold text-[clamp(4rem,15vw,11rem)] leading-[0.82] uppercase text-balance tracking-tight max-w-6xl animate-fade-up">
+          <h1 className="font-display font-bold text-[clamp(3rem,12vw,11rem)] leading-[0.85] uppercase text-balance tracking-tight max-w-6xl animate-fade-up">
             Passez en mode
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-primary">God Tier.</span>
@@ -142,9 +142,9 @@ export default function Home() {
 
             <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 sm:items-center">
               {/* CTA principal — Boutique */}
-              <Link to="/boutique" className="group relative inline-flex items-center justify-center shrink-0 brut-btn-shadow">
-                <div className="relative bg-background border-2 border-primary text-primary px-8 py-4 flex items-center gap-3 transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                  <span className="font-display text-3xl uppercase font-bold tracking-wider">Start [Boutique]</span>
+              <Link to="/boutique" className="group relative inline-flex items-center justify-center shrink-0 brut-btn-shadow w-full sm:w-auto max-w-full">
+                <div className="relative bg-background border-2 border-primary text-primary px-6 sm:px-8 py-4 flex items-center justify-center gap-3 transition-colors group-hover:bg-primary group-hover:text-primary-foreground w-full sm:w-auto">
+                  <span className="font-display text-2xl sm:text-3xl uppercase font-bold tracking-wider">Start [Boutique]</span>
                   <span className="size-3 bg-primary group-hover:bg-background animate-blink" />
                 </div>
               </Link>
@@ -165,19 +165,19 @@ export default function Home() {
           </div>
 
           {/* Stats bar */}
-          <dl className="mt-14 grid grid-cols-3 border-2 border-border bg-card divide-x-2 divide-border animate-fade-up" style={{ animationDelay: "240ms" }}>
-            <div className="p-5 md:p-6">
-              <dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Clients</dt>
-              <dd className="font-display text-3xl md:text-5xl font-bold tabular-nums">+500</dd>
+          <dl className="mt-10 md:mt-14 grid grid-cols-3 border-2 border-border bg-card divide-x-2 divide-border animate-fade-up" style={{ animationDelay: "240ms" }}>
+            <div className="p-3 sm:p-5 md:p-6">
+              <dt className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Clients</dt>
+              <dd className="font-display text-2xl sm:text-3xl md:text-5xl font-bold tabular-nums leading-none">+500</dd>
             </div>
-            <div className="p-5 md:p-6">
-              <dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Activation</dt>
-              <dd className="font-display text-3xl md:text-5xl font-bold tabular-nums">{"<"}5<span className="text-base text-muted-foreground ml-1">min</span></dd>
+            <div className="p-3 sm:p-5 md:p-6">
+              <dt className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Activation</dt>
+              <dd className="font-display text-2xl sm:text-3xl md:text-5xl font-bold tabular-nums leading-none">{"<"}5<span className="text-xs sm:text-base text-muted-foreground ml-1">min</span></dd>
             </div>
-            <div className="p-5 md:p-6">
-              <dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Note</dt>
-              <dd className="font-display text-3xl md:text-5xl font-bold tabular-nums flex items-baseline gap-1">
-                4.9<Star className="size-5 fill-primary text-primary" />
+            <div className="p-3 sm:p-5 md:p-6">
+              <dt className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Note</dt>
+              <dd className="font-display text-2xl sm:text-3xl md:text-5xl font-bold tabular-nums flex items-baseline gap-1 leading-none">
+                4.9<Star className="size-4 sm:size-5 fill-primary text-primary" />
               </dd>
             </div>
           </dl>

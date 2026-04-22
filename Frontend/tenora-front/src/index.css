@@ -86,7 +86,11 @@
 
 @layer base {
   * { @apply border-border; }
-  html { -webkit-tap-highlight-color: transparent; }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    /* Empêche le double-tap zoom sur Android, garde le pinch-zoom volontaire */
+    touch-action: manipulation;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -94,6 +98,8 @@
       radial-gradient(700px 400px at 100% 0%, hsl(300 100% 25% / 0.10), transparent 60%),
       radial-gradient(600px 400px at 0% 100%, hsl(180 100% 25% / 0.08), transparent 55%);
     background-attachment: fixed;
+    /* Évite le bounce blanc sur iOS/Android quand on overscroll */
+    overscroll-behavior-y: none;
   }
   h1,h2,h3,h4 {
     font-family: 'Teko', 'Space Grotesk', sans-serif;
@@ -102,6 +108,25 @@
     line-height: 0.9;
   }
   ::selection { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+
+  /* Active state tactile (feeling natif) — uniquement sur appareils tactiles */
+  @media (hover: none) and (pointer: coarse) {
+    a:active,
+    button:active,
+    [role="button"]:active {
+      transform: scale(0.97);
+      transition: transform 80ms ease-out;
+    }
+    /* Désactive backdrop-blur sur mobile : coûteux GPU sur Android low-end */
+    .backdrop-blur-xl,
+    .backdrop-blur-lg,
+    .backdrop-blur-md,
+    .backdrop-blur-sm,
+    .backdrop-blur {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+  }
 }
 
 @layer components {
@@ -177,6 +202,13 @@
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
   .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem); }
+  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+  .h-safe-top { height: env(safe-area-inset-top, 0px); }
+  .px-safe { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+
+  /* Garantit qu'on respecte la hauteur visible réelle (Android/iOS barres dynamiques) */
+  .min-h-dvh { min-height: 100dvh; }
+  .h-dvh { height: 100dvh; }
 }
 
 @layer utilities {
