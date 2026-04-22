@@ -14,67 +14,99 @@ from app.routes.products import router as products_router
 from app.routes.orders import router as orders_router
 from app.routes.imports import router as imports_router
 from app.routes.ebooks import router as ebooks_router
-from app.routes.site import router as site_router         
+from app.routes.site import router as site_router
 from app.routes.panel import router as panel_router
 from slowapi.errors import RateLimitExceeded
 from app.services.rate_limiter import limiter
 from app.services.scheduler import start_scheduler
 from contextlib import asynccontextmanager
 
+# ─── Logging ──────────────────────────────────────────────────────────────────
+# 12-factor : en prod on n'écrit QUE sur stdout (capture par Docker / Railway).
+# Le fichier rotatif n'est utile qu'en dev local.
 logger.remove()
 logger.add(sys.stdout, level="DEBUG" if settings.DEBUG else "INFO")
-logger.add("logs/api.log", rotation="2 hours", retention="7 days", level="INFO")
+if settings.DEBUG:
+    logger.add("logs/api.log", rotation="2 hours", retention="7 days", level="INFO")
+
+# ─── Sentry (prod uniquement) ─────────────────────────────────────────────────
+if not settings.DEBUG and settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            release=f"{settings.APP_NAME}@{settings.APP_VERSION}",
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+            send_default_pii=False,
+            integrations=[StarletteIntegration(), FastApiIntegration()],
+        )
+        logger.info("Sentry initialisé")
+    except Exception as e:
+        logger.warning(f"Sentry init failed: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     start_scheduler()
+    logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} démarré | env={settings.ENVIRONMENT}")
     yield
+    logger.info("Application arrêtée")
 
 
 app = FastAPI(
     title=settings.APP_NAME,
+    version=settings.APP_VERSION,
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url=None,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.state.limiter = limiter
+
 
 async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     """Handler stable — évite l'import du symbole privé `_rate_limit_exceeded_handler`."""
     return JSONResponse(
         status_code=429,
-        content={"detail": f"Trop de requêtes. Limite : {exc.detail}"}
+        content={"detail": f"Trop de requêtes. Limite : {exc.detail}"},
     )
+
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_FOLDER), name="uploads")
+
+
+# ─── Handler 500 — masque les détails en prod ─────────────────────────────────
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled exception | {request.method} {request.url.path}")
+    if settings.DEBUG:
+        return JSONResponse(status_code=500, content={"detail": str(exc), "type": type(exc).__name__})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Une erreur interne est survenue. Veuillez réessayer plus tard."},
+    )
 
 
 # ── Handler 422 — masque les détails Pydantic en prod ─────────────────────────
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     if settings.DEBUG:
-        return JSONResponse(
-            status_code=422,
-            content={"detail": exc.errors()}
-        )
+        return JSONResponse(status_code=422, content={"detail": exc.errors()})
     errors = exc.errors()
     messages = []
     for e in errors:
-        loc  = " → ".join(str(l) for l in e.get("loc", []) if l != "body")
-        msg  = e.get("msg", "Valeur invalide")
-        if loc:
-            messages.append(f"{loc} : {msg}")
-        else:
-            messages.append(msg)
+        loc = " → ".join(str(l) for l in e.get("loc", []) if l != "body")
+        msg = e.get("msg", "Valeur invalide")
+        messages.append(f"{loc} : {msg}" if loc else msg)
     detail = " | ".join(messages) if messages else "Données invalides. Vérifiez votre saisie."
     logger.warning(f"Validation error | {request.method} {request.url.path} | {exc.errors()}")
-    return JSONResponse(
-        status_code=422,
-        content={"detail": detail}
-    )
+    return JSONResponse(status_code=422, content={"detail": detail})
 
 
 @app.middleware("http")
@@ -86,19 +118,23 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["X-Process-Time"] = str(process_time)
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["X-Process-Time"] = f"{process_time:.4f}"
     if not settings.DEBUG:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # log lent (>1s)
+    if process_time > 1.0:
+        logger.warning(f"SLOW {request.method} {request.url.path} | {process_time:.2f}s")
     return response
 
 
-app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY, https_only=not settings.DEBUG, same_site="lax")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
@@ -118,14 +154,31 @@ async def sitemap():
     return FileResponse("sitemap.xml", media_type="application/xml")
 
 
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
 async def health_check():
-    return {"status": "ok"}
+    """Liveness probe — n'interroge PAS la DB pour rester rapide & stable."""
+    return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+
+
+@app.get("/health/db", include_in_schema=False)
+async def health_db():
+    """Readiness probe — vérifie la connexion DB."""
+    from sqlalchemy import text
+    from app.database import SessionLocal
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {"status": "ok", "db": "up"}
+    except Exception as e:
+        logger.error(f"DB health check failed: {e}")
+        return JSONResponse(status_code=503, content={"status": "error", "db": "down"})
+
 
 app.include_router(auth_router,     prefix="/auth",     tags=["Auth"])
 app.include_router(products_router, prefix="/products", tags=["Products"])
 app.include_router(orders_router,   prefix="/orders",   tags=["Orders"])
 app.include_router(imports_router,  prefix="/imports",  tags=["Import/Export"])
 app.include_router(ebooks_router,   prefix="/ebooks",   tags=["Ebooks"])
-app.include_router(site_router,                         tags=["Site"])   # ✅ FIX — était manquant
+app.include_router(site_router,                         tags=["Site"])
 app.include_router(panel_router,                        tags=["Admin Panel"])

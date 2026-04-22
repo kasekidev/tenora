@@ -1,12 +1,13 @@
 from pydantic_settings import BaseSettings
 from typing import List
-import json
+
 
 class Settings(BaseSettings):
     # Identité
     APP_NAME:    str  = "Tenora"
-    DEBUG:       bool 
-    ENVIRONMENT : str 
+    APP_VERSION: str  = "1.0.0"
+    DEBUG:       bool = False
+    ENVIRONMENT: str  = "production"
     SITE_URL:    str  = "https://tenora.store"
 
     # Sécurité
@@ -26,7 +27,7 @@ class Settings(BaseSettings):
     R2_ACCESS_KEY_ID:     str = ""
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET_NAME:       str = ""
-    R2_PUBLIC_URL:        str = ""   # ex: https://pub-xxx.r2.dev ou ton domaine custom
+    R2_PUBLIC_URL:        str = ""
 
     # Emails Resend
     RESEND_API_KEY: str = ""
@@ -36,7 +37,13 @@ class Settings(BaseSettings):
     # WhatsApp
     WHATSAPP_NUMBER: str = ""
 
+    # === Observabilité (NEW) ===
+    SENTRY_DSN:                 str   = ""
+    SENTRY_TRACES_SAMPLE_RATE:  float = 0.1
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.0
+
     class Config:
         env_file = ".env"
+
 
 settings = Settings()
