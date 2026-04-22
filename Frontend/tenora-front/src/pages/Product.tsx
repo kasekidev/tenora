@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSite } from "@/context/SiteContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { HighlightedText } from "@/components/ui/HighlightedText";
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -159,7 +160,12 @@ export default function ProductPage() {
         <div className="space-y-5">
           <div>
             <h1 className="font-display text-2xl md:text-3xl font-bold">{product.name}</h1>
-            {product.description && <p className="text-muted-foreground mt-2">{product.description}</p>}
+            {product.description && (
+              <HighlightedText
+                text={product.description}
+                className="text-muted-foreground mt-2 leading-relaxed"
+              />
+            )}
           </div>
 
           <div className="flex items-baseline gap-3">

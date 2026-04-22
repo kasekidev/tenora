@@ -1,5 +1,6 @@
+// Frontend/tenora-front/src/lib/api.ts
 // Tenora API client — port React du fichier src/api/index.ts d'origine.
-// La logique HTTP reste strictement identique au backend (mêmes endpoints, mêmes payloads).
+// La logique HTTP reste strictement identique au backend (memes endpoints, memes payloads).
 import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
 
@@ -34,9 +35,9 @@ api.interceptors.response.use(
     if (!error.response) {
       window.dispatchEvent(new CustomEvent("tenora:api-error", { detail: { type: "network" } }));
       if (error.code === "ECONNABORTED") {
-        toast.error("La requête a pris trop de temps. Vérifiez votre connexion.");
+        toast.error("La requete a pris trop de temps. Verifiez votre connexion.");
       } else if (error.code !== "ERR_NETWORK" && error.message !== "Network Error") {
-        toast.error("Impossible de contacter le serveur. Réessayez.");
+        toast.error("Impossible de contacter le serveur. Reessayez.");
       }
       return Promise.reject(error);
     }
@@ -49,8 +50,6 @@ api.interceptors.response.use(
         url.includes("/auth/me") ||
         url.includes("/auth/login") ||
         url.includes("/auth/register");
-      // Ne wipe la session QUE si le 401 vient d'un endpoint proteg ,
-      // pas d'un echec de login/register (sinon faux positif "session expiree").
       if (!isAuthEndpoint) _onUnauthorized?.();
       if (!isAuthEndpoint && current !== "/connexion" && current !== "/inscription") {
         window.location.href = `/connexion?redirect=${encodeURIComponent(current)}`;
@@ -63,11 +62,11 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     if (status === 429) {
-      toast.warning("Trop de requêtes. Patientez quelques instants avant de réessayer.");
+      toast.warning("Trop de requetes. Patientez quelques instants avant de reessayer.");
       return Promise.reject(error);
     }
     if (status >= 500) {
-      toast.error("Une erreur serveur est survenue. Notre équipe a été alertée.");
+      toast.error("Une erreur serveur est survenue. Notre equipe a ete alertee.");
       return Promise.reject(error);
     }
     return Promise.reject(error);
@@ -162,6 +161,9 @@ export interface SiteInit {
   announcement: { enabled: boolean; text: string };
   payment_methods: PaymentMethod[];
   whatsapp_number: string;
+  /** IDs des produits mis en avant (section "Hot Now" sur la home),
+   *  configures dans le panel admin via la cle de settings `featured_product_ids`. */
+  featured_product_ids: number[];
 }
 
 // ─── Endpoints ─────────────────────────────────────────────
@@ -182,6 +184,10 @@ export const productsApi = {
     api.get<Product[]>(`/products/categories/${categoryId}/products`),
   getShopProducts: (params?: { category_id?: number; q?: string; sort?: string }) =>
     api.get<Product[]>("/products/shop", { params }),
+  /** Recupere plusieurs produits actifs en une requete. Utilise pour la
+   *  section "Hot Now" : on passe les IDs renvoyes par /site/init. */
+  getByIds: (ids: number[]) =>
+    api.get<Product[]>("/products/by-ids", { params: { ids: ids.join(",") } }),
   getProduct: (id: number) => api.get<Product>(`/products/${id}`),
   search: (q: string) => api.get<Product[]>("/products/search", { params: { q } }),
   getWhatsappLink: (productId: number, params: URLSearchParams) =>
