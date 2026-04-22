@@ -38,14 +38,21 @@ def _build_site_data(db: Session) -> dict:
     maintenance    = get_setting(db, "maintenance_mode", False)
     announcement   = get_setting(db, "announcement", DEFAULT_ANNOUNCEMENT)
     payment_methods = get_setting(db, "payment_methods", DEFAULT_PAYMENT_METHODS)
+    featured_ids   = get_setting(db, "featured_product_ids", [])
 
     # Ne retourner que les méthodes actives au frontend
     active_methods = [m for m in payment_methods if m.get("enabled", True)]
 
+    # Sécurise le typage (toujours une liste d'int)
+    if not isinstance(featured_ids, list):
+        featured_ids = []
+    featured_ids = [int(x) for x in featured_ids if isinstance(x, (int, str)) and str(x).lstrip("-").isdigit()]
+
     return {
-        "maintenance":      bool(maintenance),
-        "announcement":     announcement if isinstance(announcement, dict) else DEFAULT_ANNOUNCEMENT,
-        "payment_methods":  active_methods,
+        "maintenance":          bool(maintenance),
+        "announcement":         announcement if isinstance(announcement, dict) else DEFAULT_ANNOUNCEMENT,
+        "payment_methods":      active_methods,
+        "featured_product_ids": featured_ids,
     }
 
 

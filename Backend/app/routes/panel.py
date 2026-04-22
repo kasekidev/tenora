@@ -66,6 +66,9 @@ class PaymentMethodUpdate(BaseModel):
 class SettingPaymentMethods(BaseModel):
     methods: list[PaymentMethodUpdate]
 
+class SettingFeaturedProducts(BaseModel):
+    product_ids: list[int]
+
 class CategoryCreate(BaseModel):
     name: str
     slug: str
@@ -765,11 +768,15 @@ def get_settings(
     announcement    = get_setting(db, "announcement", DEFAULT_ANNOUNCEMENT)
     payment_methods = get_setting(db, "payment_methods", DEFAULT_PAYMENT_METHODS)
     whatsapp_number = get_setting(db, "whatsapp_number", settings.WHATSAPP_NUMBER or "")
+    featured_ids   = get_setting(db, "featured_product_ids", [])
+    if not isinstance(featured_ids, list):
+        featured_ids = []
     return {
-        "maintenance":     bool(maintenance),
-        "announcement":    announcement,
-        "payment_methods": payment_methods,
-        "whatsapp_number": whatsapp_number,
+        "maintenance":          bool(maintenance),
+        "announcement":         announcement,
+        "payment_methods":      payment_methods,
+        "whatsapp_number":      whatsapp_number,
+        "featured_product_ids": featured_ids,
     }
 
 
@@ -834,3 +841,76 @@ def update_payment_methods(
     invalidate_site_cache()
     logger.info(f"Modes de paiement mis à jour | admin_id={admin.id}")
     return {"message": "Modes de paiement sauvegardés.", "methods": updated}
+
+
+# ─── PRODUITS MIS EN AVANT (HOT NOW) ──────────────────────────────────────────
+
+@router.get("/settings/featured-products")
+def get_featured_products(
+    db:    Session = Depends(get_db),
+    admin: User    = Depends(get_admin_user),
+):
+    """Retourne la liste ordonnée des IDs de produits mis en avant + détails."""
+    raw = get_setting(db, "featured_product_ids", [])
+    if not isinstance(raw, list):
+        raw = []
+    ids = [int(x) for x in raw if isinstance(x, (int, str)) and str(x).lstrip("-").isdigit()]
+
+    products = []
+    if ids:
+        rows = db.query(Product).filter(Product.id.in_(ids)).all()
+        rows_by_id = {p.id: p for p in rows}
+        for pid in ids:
+            p = rows_by_id.get(pid)
+            if p:
+                products.append({
+                    "id":         p.id,
+                    "name":       p.name,
+                    "price":      float(p.price),
+                    "is_active":  p.is_active,
+                    "stock":      p.stock,
+                })
+    return {"product_ids": ids, "products": products}
+
+
+@router.put("/settings/featured-products")
+def update_featured_products(
+    data:  SettingFeaturedProducts,
+    db:    Session = Depends(get_db),
+    admin: User    = Depends(get_admin_user),
+):
+    """
+    Met à jour la liste ordonnée des produits mis en avant sur la home (Hot Now).
+    L'ordre du tableau est préservé. Limite à 12 produits.
+    """
+    # Dédoublonne en préservant l'ordre
+    seen = set()
+    cleaned: list[int] = []
+    for pid in data.product_ids:
+        if pid in seen:
+            continue
+        seen.add(pid)
+        cleaned.append(int(pid))
+
+    if len(cleaned) > 12:
+        raise HTTPException(status_code=400, detail="Maximum 12 produits Hot Now.")
+
+    if cleaned:
+        existing = {
+            row.id for row in db.query(Product.id).filter(Product.id.in_(cleaned)).all()
+        }
+        missing = [pid for pid in cleaned if pid not in existing]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Produit(s) introuvable(s) : {missing}",
+            )
+
+    set_setting(db, "featured_product_ids", cleaned)
+    invalidate_site_cache()
+    logger.info(f"Hot Now mis à jour | ids={cleaned} | admin_id={admin.id}")
+    return {
+        "message":     f"{len(cleaned)} produit(s) en Hot Now.",
+        "product_ids": cleaned,
+    }
+

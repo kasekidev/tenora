@@ -269,6 +269,44 @@ def get_products(request: Request, db: Session = Depends(get_db)):
     ]
 
 
+
+@router.get("/by-ids", response_model=list[ProductResponse])
+def get_products_by_ids(
+    ids: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Récupère plusieurs produits actifs en une requête, à partir d'une liste
+    d'IDs séparés par des virgules. Utilisé notamment par la section
+    "Hot Now" de la page d'accueil (produits mis en avant via le panel admin).
+    """
+    try:
+        id_list = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Liste d'IDs invalide.")
+    if not id_list:
+        return []
+    # Limite raisonnable
+    id_list = id_list[:50]
+
+    products   = (
+        db.query(Product)
+          .filter(Product.id.in_(id_list), Product.is_active == True)
+          .all()
+    )
+    base       = get_base_url(request)
+    cat_images = get_category_images(db, {p.category_id for p in products}, base)
+    ratings    = get_ratings(db, [p.id for p in products])
+    return [
+        ProductResponse.from_orm_with_url(
+            p, base, *ratings.get(p.id, (None, 0)),
+            fallback_image=cat_images.get(p.category_id)
+        )
+        for p in products
+    ]
+
+
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: int, request: Request, db: Session = Depends(get_db)):
     p = db.query(Product).filter(Product.id == product_id).first()
