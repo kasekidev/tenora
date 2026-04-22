@@ -11,8 +11,6 @@ export default function ImportPage() {
   const wa = site?.whatsapp_number?.replace(/\D/g, "") || "";
 
   // ── Catégories : on ne garde QUE les sous-catégories du service `import_export`.
-  //    - On exclut les parents (Import, Ebooks, etc.) qui ne sont que des regroupements.
-  //    - On affiche directement "Shein", "Alibaba"… (pas de "Import › Shein").
   const { data: tree = [] } = useQuery({
     queryKey: ["categories", "tree"],
     queryFn: () => productsApi.getCategoriesTree().then((r) => r.data),
@@ -21,8 +19,6 @@ export default function ImportPage() {
   const importChoices = tree
     .filter((c: CategoryTree) => c.service_type === "import_export")
     .flatMap((c) =>
-      // Si le parent a des sous-catégories, on n'expose QUE les enfants.
-      // Sinon (catégorie d'import sans enfant), on expose le parent lui-même.
       c.subcategories.length > 0
         ? c.subcategories.map((s) => ({ id: s.id, name: s.name }))
         : [{ id: c.id, name: c.name }]
@@ -46,7 +42,16 @@ export default function ImportPage() {
         article_url: url,
         article_description: desc || undefined,
       });
-      if (file) await importsApi.uploadScreenshot(r.data.id, file);
+      if (file) {
+        try {
+          await importsApi.uploadScreenshot(r.data.id, file);
+        } catch (err) {
+          // L'upload de screenshot ne doit pas bloquer la redirection WhatsApp :
+          // l'utilisateur pourra toujours envoyer la capture dans la conversation.
+          console.warn("Upload screenshot échoué (non bloquant)", err);
+          toast.warning("Capture non envoyée — vous pourrez la joindre dans WhatsApp.");
+        }
+      }
       setCreatedId(r.data.id);
       toast.success("Demande envoyée — redirection vers WhatsApp…");
     } catch (e: any) {
@@ -57,12 +62,15 @@ export default function ImportPage() {
   };
 
   // ── Redirection WhatsApp automatique juste après confirmation ─────────────
+  // window.open(..., "_blank") au lieu de location.href :
+  //   - évite les blocages iOS Safari sur les redirections top-frame post-POST
+  //   - laisse la SPA intacte si l'utilisateur revient en arrière
+  //   - se comporte comme la logique des articles (Product.tsx)
   useEffect(() => {
     if (createdId && wa) {
       const link = importsApi.getWhatsappLink(createdId);
-      // Petit délai pour laisser voir l'écran de confirmation, puis redirection.
       const t = setTimeout(() => {
-        window.location.href = link;
+        window.open(link, "_blank", "noopener,noreferrer");
       }, 1200);
       return () => clearTimeout(t);
     }
@@ -81,7 +89,11 @@ export default function ImportPage() {
           </p>
           {wa && (
             <Button asChild className="mt-5 bg-whatsapp text-whatsapp-foreground hover:opacity-90">
-              <a href={importsApi.getWhatsappLink(createdId)} target="_blank" rel="noopener">
+              <a
+                href={importsApi.getWhatsappLink(createdId)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <MessageCircle className="size-4" /> Ouvrir WhatsApp
               </a>
             </Button>

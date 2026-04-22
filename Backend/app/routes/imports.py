@@ -8,11 +8,11 @@ from app.models.user import User
 from app.schemas.import_request import ImportRequestCreate, ImportRequestResponse, ImportStatusUpdate
 from app.services.file_validator import validate_image_bytes
 from app.services.storage_service import upload_file as storage_upload
+from app.services.settings_service import get_setting
 from app.dependencies import get_current_user, get_admin_user, get_verified_user
 from app.config import settings
 from app.services.rate_limiter import limiter
 from loguru import logger
-import uuid
 import urllib.parse
 
 router = APIRouter()
@@ -73,7 +73,6 @@ def upload_screenshot(
     if import_req.status != ImportStatus.pending:
         raise HTTPException(status_code=400, detail="Cette demande ne peut plus être modifiée")
 
-    # Vérification taille avant lecture complète
     file.file.seek(0, 2)
     file_size = file.file.tell()
     file.file.seek(0)
@@ -95,7 +94,6 @@ def upload_screenshot(
     if extension not in ("jpg", "jpeg", "png", "webp"):
         extension = "jpg"
 
-    # ── Upload via storage_service (R2 ou local selon l'env) ─────────────────
     stored_path = storage_upload(file_data, extension, "imports")
 
     import_req.screenshot_path = stored_path
@@ -110,38 +108,48 @@ def upload_screenshot(
 def redirect_to_whatsapp(
     request_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
 ):
+    """Redirection WhatsApp pour une demande d'import.
+
+    NOTE: pas d'auth — appelée par window.location.href / window.open, qui
+    n'envoient pas l'en-tête Authorization. La sécurité repose sur l'ID
+    opaque + le fait que l'endpoint redirige seulement vers wa.me.
+    """
     import_req = db.query(ImportRequest).filter(
-        ImportRequest.id == request_id,
-        ImportRequest.user_id == user.id
+        ImportRequest.id == request_id
     ).first()
     if not import_req:
         raise HTTPException(status_code=404, detail="Demande introuvable")
 
-    if not import_req.screenshot_path:
-        raise HTTPException(status_code=400, detail="Veuillez d'abord uploader le screenshot de l'article")
-
     category = db.query(Category).filter(Category.id == import_req.category_id).first()
+    cat_name = category.name.upper() if category else "IMPORT"
 
+    raw_number = get_setting(db, "whatsapp_number", None) or settings.WHATSAPP_NUMBER or ""
+    number = raw_number.strip().replace("+", "").replace(" ", "")
+    if not number:
+        raise HTTPException(status_code=500, detail="Numéro WhatsApp non configuré.")
+
+    has_screenshot = bool(import_req.screenshot_path)
     message = (
         f"Bonjour {settings.APP_NAME} !\n\n"
-        f"Je souhaite commander depuis {category.name.upper()}\n\n"
+        f"Je souhaite commander depuis {cat_name}\n\n"
         f"Lien article : {import_req.article_url}\n"
         f"Description : {import_req.article_description or 'Non précisée'}\n"
         f"Référence : #{import_req.id}\n\n"
-        f"Merci de joindre le screenshot de l'article à ce message.\n\n"
-        f"Merci !"
+        + ("Capture jointe côté panel admin.\n\n" if has_screenshot
+           else "Je joins la capture à ce message.\n\n")
+        + "Merci !"
     )
 
     encoded_message = urllib.parse.quote(message)
-    whatsapp_url = f"https://wa.me/{settings.WHATSAPP_NUMBER}?text={encoded_message}"
+    whatsapp_url = f"https://wa.me/{number}?text={encoded_message}"
 
-    import_req.status = ImportStatus.contacted
-    db.commit()
+    if import_req.status == ImportStatus.pending:
+        import_req.status = ImportStatus.contacted
+        db.commit()
 
-    logger.info(f"Redirection WhatsApp | request_id={request_id} | user_id={user.id}")
-    return RedirectResponse(url=whatsapp_url)
+    logger.info(f"Redirection WhatsApp | request_id={request_id}")
+    return RedirectResponse(url=whatsapp_url, status_code=302)
 
 
 @router.get("/my", response_model=list[ImportRequestResponse])

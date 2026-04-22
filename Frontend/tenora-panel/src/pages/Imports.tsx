@@ -17,12 +17,10 @@ import { toast } from "sonner";
 interface ImportItem {
   id: number;
   user_email?: string;
+  category_name?: string;
   product_link?: string;
   product_name?: string;
   product_url?: string;
-  quantity?: number;
-  estimated_price?: number;
-  total_price?: number;
   status: string;
   staff_note?: string;
   created_at: string;
@@ -30,14 +28,15 @@ interface ImportItem {
   screenshot_path?: string;
 }
 
+// Statuts alignés avec Backend/app/models/import_request.py (ImportStatus)
+// et la liste IMPORT_STATUSES de app/routes/panel.py.
 const statusOptions = [
-  { label: "Toutes", value: "all" },
+  { label: "Toutes",     value: "all" },
   { label: "En attente", value: "pending" },
-  { label: "Approuvee", value: "approved" },
-  { label: "En cours", value: "processing" },
-  { label: "Expediee", value: "shipped" },
-  { label: "Recue", value: "received" },
-  { label: "Rejetee", value: "rejected" },
+  { label: "Contactée",  value: "contacted" },
+  { label: "En cours",   value: "in_progress" },
+  { label: "Livrée",     value: "delivered" },
+  { label: "Annulée",    value: "cancelled" },
 ];
 const editStatuses = statusOptions.slice(1);
 
@@ -65,6 +64,7 @@ export default function Imports() {
       setItems(Array.isArray(data) ? data : data?.imports || []);
     } catch (e) {
       console.error(e);
+      toast.error("Impossible de charger les demandes d'import");
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,6 @@ export default function Imports() {
 
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-  const fmt = (n?: number) => n != null ? `${n.toLocaleString("fr-FR")} F` : "--";
 
   const open = (i: ImportItem) => {
     setSelected(i); setEditStatus(i.status); setStaffNote(i.staff_note || "");
@@ -141,11 +140,14 @@ export default function Imports() {
                     {i.user_email?.[0]?.toUpperCase() || "?"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{i.product_name || i.product_link || "--"}</p>
-                    <p className="text-[10px] mono text-muted-foreground truncate">{i.user_email}</p>
+                    <p className="text-sm font-semibold truncate">
+                      {i.category_name || "Import"}
+                    </p>
+                    <p className="text-[10px] mono text-muted-foreground truncate">
+                      {i.product_link || i.product_name || i.user_email}
+                    </p>
                   </div>
                   <div className="hidden md:block mono text-[10px] text-muted-foreground">{fmtDate(i.created_at)}</div>
-                  <div className="mono text-sm font-bold">{fmt(i.total_price ?? i.estimated_price)}</div>
                   <StatusBadge status={i.status} />
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -192,7 +194,7 @@ export default function Imports() {
               {selected.notes && (
                 <div className="brackets brut-card p-4">
                   <p className="eyebrow mb-2">// Note client</p>
-                  <p className="text-sm">{selected.notes}</p>
+                  <p className="text-sm whitespace-pre-wrap">{selected.notes}</p>
                 </div>
               )}
 
