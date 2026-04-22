@@ -12,9 +12,15 @@ export default function ImportPage() {
 
   const { data: tree = [] } = useQuery({
     queryKey: ["categories", "tree"],
-    queryFn: () => productsApi.getCategoriesTree().then((r) => r.data),
+    queryFn: () =>
+      productsApi.getCategoriesTree().then((r) =>
+        // Ne garder QUE les catégories d'import (service_type === "import_export")
+        // — les autres (gaming, streaming, ebooks…) ne sont pas concernées par
+        // la page Import. Le filtre inverse est appliqué dans Shop.tsx.
+        r.data.filter((c) => c.service_type === "import_export")
+      ),
   });
-  // Flatten (parents + sub) for selector
+  // Flatten (parents + sub) pour le selecteur
   const flat = tree.flatMap((c) => [
     { id: c.id, name: c.name },
     ...c.subcategories.map((s) => ({ id: s.id, name: `${c.name} › ${s.name}` })),
