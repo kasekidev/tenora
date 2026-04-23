@@ -4,17 +4,19 @@ Routes e-books — app/routes/ebooks.py
     from app.routes.ebooks import router as ebooks_router
     app.include_router(ebooks_router, prefix="/ebooks", tags=["Ebooks"])
 """
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models.product import Product, Category
-from app.models.order import Order, OrderStatus
-from app.models.user import User
-from app.dependencies import get_current_user
+
 from app.config import settings
-from app.services.storage_service import get_display_url, get_presigned_url, USE_R2
-from pathlib import Path
+from app.database import get_db
+from app.dependencies import get_current_user
+from app.models.order import Order, OrderStatus
+from app.models.product import Category, Product
+from app.models.user import User
+from app.services.storage_service import USE_R2, get_display_url, get_presigned_url
 
 router = APIRouter()
 

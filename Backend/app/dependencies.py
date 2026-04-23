@@ -1,10 +1,12 @@
-from fastapi import Request, HTTPException, Depends
-from sqlalchemy.orm import Session
 from datetime import datetime
+
+from fastapi import Depends, HTTPException, Request
+from loguru import logger
+from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app.models.session import Session as SessionModel
 from app.models.user import User
-from loguru import logger
 
 # ── Durées de session ────────────────────────────────────────────────────────
 # Les durées sont appliquées à la création (cf. routes/auth.py::login).

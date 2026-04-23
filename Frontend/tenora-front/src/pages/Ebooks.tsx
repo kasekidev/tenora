@@ -20,14 +20,16 @@ export default function Ebooks() {
 
   const { data: ebooks = [], isLoading } = useQuery({
     queryKey: ["ebooks"],
+    staleTime: 5 * 60_000,
     queryFn: () => ebooksApi.list().then((r) => r.data),
-  });
+});
 
   const { data: myOrders = [] } = useQuery({
-    queryKey: ["orders", "mine", user?.id],
+    queryKey: ["orders", "my"],          // ← même clé que Orders.tsx
     enabled: !!user,
+    staleTime: 30_000,
     queryFn: () => ordersApi.myOrders().then((r) => r.data),
-  });
+});
 
   const purchasedIds = useMemo(
     () => new Set(myOrders.filter((o) => o.status === "completed").map((o) => o.product_id)),

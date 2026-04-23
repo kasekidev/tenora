@@ -1,13 +1,32 @@
 import { Link } from "react-router-dom";
-import { Product, formatXOF } from "@/lib/api";
+import { Product, formatXOF, productsApi } from "@/lib/api";
 import { Zap, ArrowUpRight } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function ProductCard({ product }: { product: Product }) {
+  const qc = useQueryClient();
   const hasDiscount = !!product.discount_percent && product.discount_percent > 0;
+
+  const warmCache = () => {
+    // 1) Seed : on a déjà l'objet produit complet dans la liste,
+    //    autant le placer dans le cache de la query produit.
+    qc.setQueryData(["product", product.id], product);
+
+    // 2) Prefetch léger pour rafraîchir en arrière-plan si stale.
+    qc.prefetchQuery({
+      queryKey: ["product", product.id],
+      queryFn: () => productsApi.getProduct(product.id).then((r) => r.data),
+      staleTime: 2 * 60_000,
+    });
+  };
+
   return (
     <Link
       to={`/produit/${product.id}`}
       className="group block brut-card overflow-hidden"
+      onMouseEnter={warmCache}
+      onFocus={warmCache}
+      onTouchStart={warmCache}
     >
       <div className="relative aspect-square bg-muted overflow-hidden border-b-2 border-border">
         {product.image_url ? (

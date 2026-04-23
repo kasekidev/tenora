@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON, Text, DateTime
-from sqlalchemy.orm import relationship
-from app.database import Base
 from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database import Base
 
 
 class Category(Base):

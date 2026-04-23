@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr, field_validator
-from datetime import datetime
 import re
+from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, field_validator
+
 
 class UserRegister(BaseModel):
     email: EmailStr

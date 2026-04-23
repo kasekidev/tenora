@@ -4,6 +4,7 @@ Définit les variables d'environnement minimales avant l'import de l'app
 pour que `Settings` puisse être instancié sans .env complet.
 """
 import os
+
 import pytest
 
 os.environ.setdefault("DEBUG", "true")
@@ -13,6 +14,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("ALLOWED_ORIGINS", '["http://localhost"]')
 
 from fastapi.testclient import TestClient  # noqa: E402
+
 from app.main import app  # noqa: E402
 
 

@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
-from loguru import logger
 
+from loguru import logger
 
 _attempts: dict = {}
 
-MAX_ATTEMPTS = 5         
-BLOCK_DURATION = 15       
-WINDOW_DURATION = 10      
+MAX_ATTEMPTS = 5
+BLOCK_DURATION = 15
+WINDOW_DURATION = 10
 
 def is_blocked(ip: str) -> bool:
     if ip not in _attempts:

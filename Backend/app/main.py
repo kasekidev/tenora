@@ -1,26 +1,28 @@
-from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 import os
+import sys
+import time
+from contextlib import asynccontextmanager
+
 import uvicorn
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from starlette.middleware.sessions import SessionMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
-import time, sys
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.sessions import SessionMiddleware
+
 from app.config import settings
 from app.routes.auth import router as auth_router
-from app.routes.products import router as products_router
-from app.routes.orders import router as orders_router
-from app.routes.imports import router as imports_router
 from app.routes.ebooks import router as ebooks_router
-from app.routes.site import router as site_router
+from app.routes.imports import router as imports_router
+from app.routes.orders import router as orders_router
 from app.routes.panel import router as panel_router
-from slowapi.errors import RateLimitExceeded
+from app.routes.products import router as products_router
+from app.routes.site import router as site_router
 from app.services.rate_limiter import limiter
 from app.services.scheduler import start_scheduler
-from contextlib import asynccontextmanager
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 # 12-factor : en prod on n'écrit QUE sur stdout (capture par Docker / Railway).
@@ -165,6 +167,7 @@ async def health_check():
 async def health_db():
     """Readiness probe — vérifie la connexion DB."""
     from sqlalchemy import text
+
     from app.database import SessionLocal
     try:
         db = SessionLocal()

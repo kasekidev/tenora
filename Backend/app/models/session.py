@@ -1,7 +1,9 @@
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Index
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
 from app.database import Base
+
 
 class Session(Base):
     __tablename__ = "sessions"

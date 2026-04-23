@@ -1,8 +1,10 @@
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
+
 import resend
-from concurrent.futures import ThreadPoolExecutor, Future
-from app.config import settings
 from loguru import logger
+
+from app.config import settings
 
 resend.api_key = settings.RESEND_API_KEY
 

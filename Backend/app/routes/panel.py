@@ -1,29 +1,36 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+import csv
+import io
+import re
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, case, and_
+from loguru import logger
+from pydantic import BaseModel
+from sqlalchemy import and_, case, func
 from sqlalchemy.exc import IntegrityError
-from app.database import get_db
-from app.models.user import User
-from app.models.product import Product, Category
-from app.models.order import Order, OrderStatus
-from app.models.import_request import ImportRequest
-from app.dependencies import get_admin_user
+from sqlalchemy.orm import Session, joinedload
+
 from app.config import settings
+from app.database import get_db
+from app.dependencies import get_admin_user
+from app.models.import_request import ImportRequest
+from app.models.order import Order, OrderStatus
+from app.models.product import Category, Product
+from app.models.user import User
+from app.routes.site import invalidate_site_cache
+from app.services.settings_service import (
+    DEFAULT_ANNOUNCEMENT,
+    DEFAULT_PAYMENT_METHODS,
+    get_setting,
+    set_setting,
+)
 from app.services.storage_service import (
-    upload_file as storage_upload,
     delete_file as storage_delete,
 )
-from app.services.settings_service import (
-    get_setting, set_setting,
-    DEFAULT_PAYMENT_METHODS, DEFAULT_ANNOUNCEMENT,
+from app.services.storage_service import (
+    upload_file as storage_upload,
 )
-from app.routes.site import invalidate_site_cache
-from loguru import logger
-from datetime import datetime, timedelta
-from collections import defaultdict
-from pydantic import BaseModel
-import json, csv, io, re
 
 try:
     from PIL import Image as _PilImage
@@ -327,7 +334,7 @@ def update_order_status(
     if data.status not in ORDER_STATUSES:
         raise HTTPException(status_code=400, detail=f"Statut invalide : {data.status}")
 
-    from app.services.mail_service import send_order_completed, send_order_rejected, send_order_refunded
+    from app.services.mail_service import send_order_completed
 
     # client et product déjà chargés via joinedload — aucune requête supplémentaire
     client  = order.user

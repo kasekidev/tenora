@@ -100,17 +100,17 @@ const whyUs = [
 ];
 
 export default function Home() {
-  // On lit d'abord les settings du site pour connaitre les produits mis en avant
-  // par l'admin (cle `featured_product_ids` cote backend, exposee via /site/init).
-  const { data: site } = useSite();
+  const { data: site, loading: siteLoading } = useSite();
   const featuredIds = site?.featured_product_ids ?? [];
+  const featuredKey = featuredIds.join(",");
 
+  // ⚡ On n'active la query qu'une fois site chargé pour éviter la cascade
+  //    "fetch [] puis re-fetch [vraies IDs]" qui doublait l'appel au boot.
   const { data: products = [] } = useQuery({
-    queryKey: ["shop", "featured", featuredIds.join(",")],
+    queryKey: ["home", "featured", featuredKey],
+    enabled: !siteLoading,
+    staleTime: 5 * 60_000,
     queryFn: async () => {
-      // 1) Si l'admin a configure des produits phares -> on les affiche dans
-      //    l'ordre choisi dans le panel (et on filtre ceux desactives/supprimes
-      //    via le endpoint backend /products/by-ids qui ne retourne que les actifs).
       if (featuredIds.length > 0) {
         const res = await productsApi.getByIds(featuredIds);
         const byId = new Map(res.data.map((p) => [p.id, p]));
@@ -119,11 +119,11 @@ export default function Home() {
           .filter((p): p is NonNullable<typeof p> => Boolean(p))
           .slice(0, 8);
       }
-      // 2) Fallback : derniers produits ajoutes (comportement historique).
       const res = await productsApi.getShopProducts({ sort: "newest" });
       return res.data.slice(0, 8);
     },
   });
+
   const wa = site?.whatsapp_number?.replace(/\D/g, "") || "";
   const waUrl = wa
     ? `https://wa.me/${wa}?text=${encodeURIComponent("Bonjour Tenora, je voudrais passer une commande.")}`

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Search, SlidersHorizontal, X, ChevronDown, ShoppingBag } from "lucide-react";
 import { productsApi, type CategoryTree } from "@/lib/api";
 import { ProductCard } from "@/components/product/ProductCard";
@@ -21,28 +21,31 @@ export default function Shop() {
     "md:min-h-0 md:h-full md:overflow-y-auto md:overscroll-contain md:[overscroll-behavior:contain] md:[touch-action:pan-y]";
 
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 280);
+    const t = setTimeout(() => setDebounced(query.trim()), 400);
     return () => clearTimeout(t);
   }, [query]);
 
-  const { data: tree = [], isLoading: loadingCats } = useQuery({
-    queryKey: ["categories", "tree"],
-    queryFn: () =>
-      productsApi.getCategoriesTree().then((r) =>
-        // Exclure les catégories "import_export" — elles ont leur propre page /import.
-        r.data.filter((c) => c.service_type !== "import_export")
-      ),
-  });
+ const { data: tree = [], isLoading: loadingCats } = useQuery({
+  queryKey: ["categories", "tree"],
+  staleTime: 30 * 60_000,
+  gcTime: 60 * 60_000,
+  queryFn: () =>
+    productsApi.getCategoriesTree().then((r) =>
+      r.data.filter((c) => c.service_type !== "import_export")
+    ),
+});
 
   const { data: products = [], isLoading: loadingProducts } = useQuery({
-    queryKey: ["shop", { selectedId, q: debounced }],
-    queryFn: () =>
-      productsApi
-        .getShopProducts({
-          category_id: selectedId ?? undefined,
-          q: debounced || undefined,
-        })
-        .then((r) => r.data),
+  queryKey: ["shop", { selectedId, q: debounced }],
+  staleTime: 60_000,
+  placeholderData: keepPreviousData, // ← garde l'ancienne grille pendant le fetch
+  queryFn: () =>
+    productsApi
+      .getShopProducts({
+        category_id: selectedId ?? undefined,
+        q: debounced || undefined,
+      })
+      .then((r) => r.data),
   });
 
   const currentTitle = useMemo(() => {

@@ -18,10 +18,13 @@ export default function ProductPage() {
   const productId = Number(id);
 
   const { data: product, isLoading, error } = useQuery({
-    queryKey: ["product", productId],
-    queryFn: () => productsApi.getProduct(productId).then((r) => r.data),
-    enabled: !!productId,
+  queryKey: ["product", productId],
+  queryFn: () => productsApi.getProduct(productId).then((r) => r.data),
+  enabled: !!productId,
+  staleTime: 2 * 60_000,
+  gcTime: 10 * 60_000,
   });
+
 
   const [fields, setFields] = useState<Record<string, string>>({});
   const [paymentMethod, setPaymentMethod] = useState<string>("");

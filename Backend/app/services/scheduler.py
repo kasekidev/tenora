@@ -1,10 +1,12 @@
-from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
-from app.models.session import Session as SessionModel
-from app.models.otp import OTPCode
 from datetime import datetime
+
+from apscheduler.schedulers.background import BackgroundScheduler
 from loguru import logger
+from sqlalchemy.orm import Session
+
+from app.database import SessionLocal
+from app.models.otp import OTPCode
+from app.models.session import Session as SessionModel
 
 scheduler = BackgroundScheduler()
 
@@ -39,9 +41,9 @@ def clean_expired_otps():
 def generate_report():
     db: Session = SessionLocal()
     try:
+        from app.models.import_request import ImportRequest
         from app.models.order import Order, OrderStatus
         from app.models.user import User
-        from app.models.import_request import ImportRequest
 
         total_users = db.query(User).count()
         new_orders = db.query(Order).filter(

@@ -13,7 +13,28 @@ import Users from "@/pages/Users";
 import SettingsPage from "@/pages/Settings";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// ──────────────────────────────────────────────────────────────────────────────
+// Panel admin — defaults plus courts que la boutique :
+// l'admin a besoin de fraîcheur (commandes, imports en cours), mais pas de
+// refetch sauvage à chaque changement d'onglet.
+//   • staleTime 30s : équilibre entre fraîcheur et nb d'appels.
+//   • refetchOnWindowFocus: true : utile pour l'admin qui jongle entre apps.
+//   • refetchOnReconnect: "always".
+// ──────────────────────────────────────────────────────────────────────────────
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      retry: 1,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: "always",
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

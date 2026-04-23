@@ -4,6 +4,7 @@ Usage : get_setting(db, "payment_methods", DEFAULT_PAYMENT_METHODS)
         set_setting(db, "maintenance_mode", True)
 """
 from __future__ import annotations
+
 from typing import Any
 
 # ── Valeurs par défaut ────────────────────────────────────────────────────────

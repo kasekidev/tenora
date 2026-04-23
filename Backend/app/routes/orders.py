@@ -1,19 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+import re
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from loguru import logger
 from sqlalchemy.orm import Session
+
 from app.database import get_db
+from app.dependencies import get_admin_user, get_current_user, get_verified_user
 from app.models.order import Order, OrderStatus
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
-from app.dependencies import get_current_user, get_admin_user, get_verified_user
 from app.services.file_validator import validate_image_bytes
-from app.services.settings_service import get_setting, DEFAULT_PAYMENT_METHODS
-from app.services.storage_service import upload_file as storage_upload
-from app.config import settings
+from app.services.mail_service import send_order_completed, send_order_refunded, send_order_rejected
 from app.services.rate_limiter import limiter
-from app.services.mail_service import send_order_completed, send_order_rejected, send_order_refunded
-from loguru import logger
-import re
+from app.services.settings_service import DEFAULT_PAYMENT_METHODS, get_setting
+from app.services.storage_service import upload_file as storage_upload
 
 router = APIRouter()
 

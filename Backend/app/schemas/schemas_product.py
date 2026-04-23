@@ -1,22 +1,23 @@
-from pydantic import BaseModel, ConfigDict, field_validator
-from typing import Optional, List, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class FieldDefinition(BaseModel):
     key: str
     label: str
-    placeholder: Optional[str] = None
+    placeholder: str | None = None
     required: bool = True
-    regex: Optional[str] = None
+    regex: str | None = None
 
 
 class CategoryCreate(BaseModel):
     name: str
     slug: str
-    description: Optional[str] = None
+    description: str | None = None
     service_type: str = "none"
-    parent_id: Optional[int] = None
+    parent_id: int | None = None
 
 
 class CategoryResponse(BaseModel):
@@ -25,12 +26,12 @@ class CategoryResponse(BaseModel):
     id: int
     name: str
     slug: str
-    description: Optional[str] = None
+    description: str | None = None
     service_type: str
-    parent_id: Optional[int] = None
+    parent_id: int | None = None
     is_active: bool
-    image_path: Optional[str] = None
-    image_url: Optional[str] = None
+    image_path: str | None = None
+    image_url: str | None = None
 
     @classmethod
     def from_orm_with_url(cls, obj, base_url: str) -> "CategoryResponse":
@@ -43,11 +44,11 @@ class CategoryResponse(BaseModel):
 class ProductCreate(BaseModel):
     category_id: int
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     price: float
-    discount_percent: Optional[float] = None
+    discount_percent: float | None = None
     stock: int = 0
-    required_fields: Optional[List[FieldDefinition]] = None
+    required_fields: list[FieldDefinition] | None = None
     whatsapp_redirect: bool = False
 
     @field_validator('discount_percent')
@@ -64,25 +65,25 @@ class ProductResponse(BaseModel):
     id: int
     category_id: int
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     price: float
-    discount_percent: Optional[float] = None
+    discount_percent: float | None = None
     final_price: float = 0.0
-    stock: Optional[int] = None
+    stock: int | None = None
     is_active: bool
-    image_path: Optional[str] = None
-    image_url: Optional[str] = None
-    required_fields: Optional[List[Any]] = None
+    image_path: str | None = None
+    image_url: str | None = None
+    required_fields: list[Any] | None = None
     whatsapp_redirect: bool = False
-    avg_rating: Optional[float] = None
+    avg_rating: float | None = None
     review_count: int = 0
     created_at: datetime
 
     @classmethod
     def from_orm_with_url(cls, obj, base_url: str,
-                           avg_rating: Optional[float] = None,
+                           avg_rating: float | None = None,
                            review_count: int = 0,
-                           fallback_image: Optional[str] = None) -> "ProductResponse":
+                           fallback_image: str | None = None) -> "ProductResponse":
         data = cls.model_validate(obj)
         # Image produit en priorité, sinon image de la catégorie en fallback
         if obj.image_path:

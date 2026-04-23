@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Text, Index
+import enum
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
 from app.database import Base
-import enum
+
 
 class ImportStatus(enum.Enum):
     pending = "pending"

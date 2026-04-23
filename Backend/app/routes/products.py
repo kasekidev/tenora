@@ -1,19 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models.product import Product, Category
-from app.schemas.schemas_product import (
-    ProductCreate, ProductResponse,
-    CategoryCreate, CategoryResponse
-)
-from app.dependencies import get_admin_user, get_current_user
-from app.models.user import User
-from app.config import settings
-from app.services.rate_limiter import limiter
-from app.services.storage_service import upload_file as storage_upload, delete_file as storage_delete, get_display_url
-from loguru import logger
 from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import RedirectResponse
+from loguru import logger
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.database import get_db
+from app.dependencies import get_admin_user
+from app.models.product import Category, Product
+from app.models.user import User
+from app.schemas.schemas_product import CategoryCreate, CategoryResponse, ProductCreate, ProductResponse
+from app.services.rate_limiter import limiter
+from app.services.storage_service import delete_file as storage_delete
+from app.services.storage_service import get_display_url
+from app.services.storage_service import upload_file as storage_upload
 
 router = APIRouter()
 

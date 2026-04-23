@@ -1,19 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request, Query
-from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models.user import User
-from app.models.session import Session as SessionModel
-from app.models.otp import OTPCode
-from app.schemas.user import UserRegister, UserLogin, UserResponse, UserUpdate
-from app.config import settings
-from app.dependencies import get_current_user
-from app.services.rate_limiter import limiter
-from app.services.mail_service import send_otp_email
-from passlib.context import CryptContext
-from datetime import datetime, timedelta
-from loguru import logger
-import secrets
 import random
+import secrets
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from loguru import logger
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.database import get_db
+from app.dependencies import get_current_user
+from app.models.otp import OTPCode
+from app.models.session import Session as SessionModel
+from app.models.user import User
+from app.schemas.user import UserLogin, UserRegister, UserResponse, UserUpdate
+from app.services.mail_service import send_otp_email
+from app.services.rate_limiter import limiter
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

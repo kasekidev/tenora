@@ -1,5 +1,5 @@
+
 from pydantic_settings import BaseSettings
-from typing import List
 
 
 class Settings(BaseSettings):
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # CORS — supporte string JSON ou liste Python
-    ALLOWED_ORIGINS: List[str] = ["https://tenora.store", "https://www.tenora.store"]
+    ALLOWED_ORIGINS: list[str] = ["https://tenora.store", "https://www.tenora.store"]
 
     # Uploads locaux (dev) — remplacé par R2 en prod
     UPLOAD_FOLDER: str = "uploads"
