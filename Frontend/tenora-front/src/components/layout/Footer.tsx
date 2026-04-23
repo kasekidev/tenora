@@ -41,7 +41,9 @@ export function Footer() {
           <h4 className="font-bold mb-4 text-xs uppercase tracking-widest text-muted-foreground">Contact</h4>
           <ul className="space-y-3 text-sm">
             <li className="flex items-center gap-2"><MapPin className="size-4 text-primary" /> Niamey, Niger</li>
-            <li className="flex items-center gap-2"><Mail className="size-4 text-primary" /> support@tenora.app</li>
+            <li className="flex items-center gap-2"><Mail className="size-4 text-primary" /> supporttenora@gmail.com</li>
+            <li className="flex items-center gap-2"><Mail className="size-4 text-primary" />Par Nebula inc. ©</li>
+
           </ul>
         </div>
       </div>
