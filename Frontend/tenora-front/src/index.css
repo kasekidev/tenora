@@ -227,14 +227,37 @@
     50% { box-shadow: 0 0 0 14px hsl(var(--primary) / 0); }
   }
 
-  .animate-fade-up { animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  /* Fade-up: state final par défaut (opacity:1). L'animation ne fait que jouer l'entrée.
+     Ça garantit que si l'animation est purgée, bloquée ou prefers-reduced-motion, le contenu reste visible. */
+  .animate-fade-up {
+    opacity: 1;
+    animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(18px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .animate-fade-in { animation: fade-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .animate-fade-in {
+    opacity: 1;
+    animation: fade-in 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Respect prefers-reduced-motion + fallback global : aucune animation ne doit cacher du contenu */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-up,
+    .animate-fade-in,
+    .animate-marquee,
+    .animate-pulse-glow,
+    .animate-glitch,
+    .animate-blink {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+      visibility: visible !important;
+    }
+  }
 
   .animate-glitch {
     animation: glitch 4s infinite;

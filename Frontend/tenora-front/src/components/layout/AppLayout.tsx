@@ -3,6 +3,7 @@ import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { MobileTabBar } from "./MobileTabBar";
 import { AnnouncementBar } from "./AnnouncementBar";
+import { WhatsAppFab } from "./WhatsAppFab";
 import { useEffect } from "react";
 
 export function AppLayout() {
@@ -21,6 +22,8 @@ export function AppLayout() {
       </main>
       <Footer />
       <MobileTabBar />
+      <WhatsAppFab />
     </div>
   );
 }
+

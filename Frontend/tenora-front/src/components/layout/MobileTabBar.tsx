@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 const tabs = [
-  { to: "/", label: "Home", icon: Home, end: true },
-  { to: "/boutique", label: "Shop", icon: ShoppingBag },
+  { to: "/", label: "Accueil", icon: Home, end: true },
+  { to: "/boutique", label: "Boutique", icon: ShoppingBag },
   { to: "/ebooks", label: "Ebooks", icon: BookOpen },
 ];
 
@@ -14,9 +14,9 @@ export function MobileTabBar() {
   const all = [
     ...tabs,
     user
-      ? { to: "/mes-commandes", label: "Cmd.", icon: Package }
-      : { to: "/connexion", label: "Login", icon: User },
-    { to: user ? "/profil" : "/inscription", label: user ? "Moi" : "Join", icon: User },
+      ? { to: "/mes-commandes", label: "Commandes", icon: Package }
+      : { to: "/connexion", label: "Connexion", icon: User },
+    { to: user ? "/profil" : "/inscription", label: user ? "Compte" : "Compte", icon: User },
   ];
 
   return (
@@ -48,7 +48,7 @@ export function MobileTabBar() {
                 <t.icon
                   className={cn(
                     "size-[20px] transition-transform",
-                    isActive && "scale-110 drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]"
+                    isActive && "scale-110"
                   )}
                 />
                 <span className="truncate max-w-full leading-none">{t.label}</span>

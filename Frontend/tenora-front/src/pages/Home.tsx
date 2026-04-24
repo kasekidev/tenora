@@ -147,7 +147,7 @@ export default function Home() {
             </span>
           </div>
 
-          <h1 className="font-display font-bold text-[clamp(3rem,12vw,11rem)] leading-[0.85] uppercase text-balance tracking-tight max-w-6xl animate-fade-up">
+          <h1 className="font-display font-bold text-[clamp(2.25rem,10vw,8rem)] leading-[0.88] uppercase text-balance tracking-tight max-w-6xl animate-fade-up">
             Passez en mode
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-primary">God Tier.</span>
