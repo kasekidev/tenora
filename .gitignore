@@ -4,6 +4,7 @@
 !.vscode/extensions.json
 .idea/
 *.swp
+.github/
 
 # --- Environnements & Secrets (CRITIQUE) ---
 .env
