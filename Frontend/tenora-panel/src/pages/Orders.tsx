@@ -26,9 +26,9 @@ const statusOptions = [
   { label: "Toutes", value: "all" },
   { label: "En attente", value: "pending" },
   { label: "En cours", value: "processing" },
-  { label: "Completees", value: "completed" },
-  { label: "Rejetees", value: "rejected" },
-  { label: "Remboursees", value: "refunded" },
+  { label: "Complétées", value: "completed" },
+  { label: "Rejetées", value: "rejected" },
+  { label: "Remboursées", value: "refunded" },
 ];
 const editStatuses = statusOptions.slice(1);
 
@@ -85,9 +85,9 @@ export default function Orders() {
     setUpdating(true);
     try {
       await updateOrderStatus(selected.id, { status: editStatus, staff_note: staffNote });
-      setOrders(orders.map((o) => o.id === selected.id ? { ...o, status: editStatus, staff_note: staffNote } : o));
-      setSelected({ ...selected, status: editStatus, staff_note: staffNote });
-      toast.success("Statut mis a jour");
+      toast.success("Statut mis à jour");
+      setShow(false);
+      fetchOrders();
     } catch {
       toast.error("Erreur");
     } finally {
@@ -102,7 +102,7 @@ export default function Orders() {
       const a = document.createElement("a");
       a.href = url; a.download = `commandes_${new Date().toISOString().slice(0, 10)}.csv`;
       a.click(); URL.revokeObjectURL(url);
-      toast.success("CSV exporte");
+      toast.success("CSV exporté");
     } catch {
       toast.error("Erreur export");
     }
@@ -110,7 +110,7 @@ export default function Orders() {
 
   return (
     <div className="space-y-6 animate-fade-up">
-      <PageHeader eyebrow="Gestion" title="Commandes" subtitle={`// ${total} entree(s)`}>
+      <PageHeader eyebrow="Gestion" title="Commandes" subtitle={`// ${total} entrée(s)`}>
         <Button variant="outline" onClick={handleExport} className="h-9 rounded-none border-2 mono uppercase tracking-wider text-xs">
           <Download className="h-3.5 w-3.5 mr-2" /> Export CSV
         </Button>
@@ -118,7 +118,18 @@ export default function Orders() {
 
       <DataCard>
         <DataCardHeader>
-          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 overflow-x-auto">
+          {/* Mobile: Select; Desktop: chips */}
+          <div className="sm:hidden w-full">
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="rounded-none border-2 mono text-xs h-9 w-full"><SelectValue /></SelectTrigger>
+              <SelectContent className="rounded-none border-2">
+                {statusOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="hidden sm:flex flex-wrap items-center gap-2 flex-1 min-w-0">
             {statusOptions.map((o) => (
               <button
                 key={o.value}
@@ -134,7 +145,7 @@ export default function Orders() {
               </button>
             ))}
           </div>
-          <span className="chip border-border ml-auto">{total} TOTAL</span>
+          <span className="chip border-border ml-auto shrink-0">{total} TOTAL</span>
         </DataCardHeader>
 
         <DataCardContent>
@@ -151,21 +162,26 @@ export default function Orders() {
                 <div
                   key={o.id}
                   onClick={() => open(o)}
-                  className="flex items-center gap-3 p-3 sm:p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                  className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 p-3 sm:p-4 cursor-pointer hover:bg-muted/30 transition-colors"
                 >
-                  <span className="mono text-[10px] text-muted-foreground w-12">#{o.id}</span>
+                  <span className="mono text-[10px] text-muted-foreground w-10 sm:w-12 shrink-0">#{o.id}</span>
                   <div className="h-9 w-9 border-2 border-primary/40 bg-primary-soft flex items-center justify-center mono text-xs font-bold text-primary shrink-0">
                     {o.user_email?.[0]?.toUpperCase() || "?"}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 basis-[55%] sm:basis-auto">
                     <p className="text-sm font-semibold truncate">{o.product_name || "--"}</p>
                     <p className="text-[10px] mono text-muted-foreground truncate">{o.user_email}</p>
+                    <p className="text-[10px] mono text-muted-foreground sm:hidden mt-0.5">{fmtDate(o.created_at)}</p>
                   </div>
-                  <div className="hidden md:block mono text-[10px] text-muted-foreground">{fmtDate(o.created_at)}</div>
-                  <div className="mono text-sm font-bold">{fmt(o.total_price)}</div>
-                  <StatusBadge status={o.status} />
-                  <span className="hidden sm:inline-block chip border-border">{o.payment_method}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+
+                  <div className="hidden md:block mono text-[10px] text-muted-foreground shrink-0">{fmtDate(o.created_at)}</div>
+
+                  <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0 flex-wrap justify-end">
+                    <div className="mono text-sm font-bold whitespace-nowrap">{fmt(o.total_price)}</div>
+                    <StatusBadge status={o.status} />
+                    <span className="hidden lg:inline-block chip border-border">{o.payment_method}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
                 </div>
               ))}
             </div>
@@ -186,7 +202,7 @@ export default function Orders() {
       </DataCard>
 
       <Dialog open={show} onOpenChange={setShow}>
-        <DialogContent className="rounded-none border-2 max-w-xl max-h-[92vh] overflow-y-auto">
+        <DialogContent className="rounded-none border-2 max-w-xl max-h-[92vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full">
           <DialogHeader>
             <DialogTitle className="mono uppercase tracking-wider text-sm">
               // Commande #{selected?.id}
@@ -194,10 +210,9 @@ export default function Orders() {
           </DialogHeader>
           {selected && (
             <div className="space-y-5">
-              {/* Status update */}
               <div className="brackets brut-card p-4 space-y-3">
                 <p className="eyebrow">// Statut</p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <Select value={editStatus} onValueChange={setEditStatus}>
                     <SelectTrigger className="rounded-none border-2 mono"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-none border-2">
@@ -214,13 +229,13 @@ export default function Orders() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mono text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mono text-xs">
                 <Field label="Client" value={selected.user_email} />
                 <Field label="Produit" value={selected.product_name} />
-                <Field label="Quantite" value={selected.quantity?.toString()} />
+                <Field label="Quantité" value={selected.quantity?.toString()} />
                 <Field label="Total" value={`${selected.total_price?.toLocaleString("fr-FR")} F`} highlight />
                 <Field label="Paiement" value={selected.payment_method} />
-                <Field label="Cree le" value={new Date(selected.created_at).toLocaleString("fr-FR")} />
+                <Field label="Créé le" value={new Date(selected.created_at).toLocaleString("fr-FR")} />
               </div>
 
               {selected.customer_info && (
@@ -257,9 +272,9 @@ export default function Orders() {
 
 function Field({ label, value, highlight }: { label: string; value?: string; highlight?: boolean }) {
   return (
-    <div className="border-2 border-border p-2.5">
+    <div className="border-2 border-border p-2.5 min-w-0">
       <p className="eyebrow mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>{label}</p>
-      <p className={cn("mono", highlight ? "text-primary font-bold text-sm" : "text-foreground text-xs")}>
+      <p className={cn("mono break-words", highlight ? "text-primary font-bold text-sm" : "text-foreground text-xs")}>
         {value || "--"}
       </p>
     </div>

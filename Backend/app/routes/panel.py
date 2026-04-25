@@ -82,12 +82,15 @@ class CategoryCreate(BaseModel):
     service_type: str = "none"
     parent_id: int | None = None
     is_active: bool = True
+    description: str | None = None
 
 class CategoryUpdate(BaseModel):
     name: str | None = None
     slug: str | None = None
     service_type: str | None = None
     is_active: bool | None = None
+    parent_id: int | None = None
+    description: str | None = None
 
 class ProductCreate(BaseModel):
     category_id: int
@@ -108,6 +111,7 @@ class ProductUpdate(BaseModel):
     required_fields: list[dict] | None = None
     whatsapp_redirect: bool | None = None
     is_active: bool | None = None
+    category_id: int | None = None
 
 
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -409,39 +413,66 @@ def export_orders_csv(
 
 @router.get("/products")
 def list_products(
-    db:    Session = Depends(get_db),
-    admin: User    = Depends(get_admin_user),
+    page:        int        = Query(1, ge=1),
+    per_page:    int        = Query(50, ge=1, le=200),
+    q:           str | None = Query(None, description="Recherche nom/description"),
+    category_id: int | None = Query(None),
+    is_active:   bool | None = Query(None),
+    db:          Session    = Depends(get_db),
+    admin:       User       = Depends(get_admin_user),
 ):
-    """Liste tous les produits.
+    """Liste paginée + filtrée des produits.
 
     OPTIMISATION N+1 : joinedload(Product.category) charge le nom de la
     catégorie en une seule JOIN au lieu d'une requête par produit.
+    OPTIMISATION : filtres + pagination côté serveur (au lieu de tout charger).
+    Format de réponse : { products, total, page, per_page }.
     """
-    products = (
+    base = (
         db.query(Product)
         .options(joinedload(Product.category))
-        .order_by(Product.created_at.desc())
-        .all()
     )
-    return [
-        {
-            "id":               p.id,
-            "category_id":      p.category_id,
-            "category_name":    p.category.name if p.category else None,
-            "name":             p.name,
-            "description":      p.description,
-            "price":            float(p.price),
-            "discount_percent": float(p.discount_percent or 0),
-            "final_price":      float(p.final_price),
-            "stock":            p.stock,
-            "is_active":        p.is_active,
-            "image_path":       p.image_path,
-            "required_fields":  p.required_fields,
-            "whatsapp_redirect": p.whatsapp_redirect,
-            "created_at":       p.created_at.isoformat(),
-        }
-        for p in products
-    ]
+    if q:
+        like = f"%{q}%"
+        base = base.filter(
+            (Product.name.ilike(like)) | (Product.description.ilike(like))
+        )
+    if category_id is not None:
+        base = base.filter(Product.category_id == category_id)
+    if is_active is not None:
+        base = base.filter(Product.is_active == is_active)
+
+    total = base.with_entities(func.count(Product.id)).scalar() or 0
+    products = (
+        base.order_by(Product.created_at.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+    )
+    return {
+        "total":    total,
+        "page":     page,
+        "per_page": per_page,
+        "products": [
+            {
+                "id":                p.id,
+                "category_id":       p.category_id,
+                "category_name":     p.category.name if p.category else None,
+                "name":              p.name,
+                "description":       p.description,
+                "price":             float(p.price),
+                "discount_percent":  float(p.discount_percent or 0),
+                "final_price":       float(p.final_price),
+                "stock":             p.stock,
+                "is_active":         p.is_active,
+                "image_path":        p.image_path,
+                "required_fields":   p.required_fields,
+                "whatsapp_redirect": p.whatsapp_redirect,
+                "created_at":        p.created_at.isoformat(),
+            }
+            for p in products
+        ],
+    }
 
 
 @router.post("/products", status_code=201)
@@ -482,7 +513,14 @@ def update_product(
     if not p:
         raise HTTPException(status_code=404, detail="Produit introuvable.")
 
-    for field, value in data.model_dump(exclude_none=True).items():
+    # `exclude_unset=True` permet d'envoyer explicitement des valeurs (y compris None)
+    # tout en ignorant les champs absents de la requête.
+    payload = data.model_dump(exclude_unset=True)
+    # Si on change la catégorie, vérifier qu'elle existe
+    if "category_id" in payload and payload["category_id"] is not None:
+        if not db.query(Category).filter(Category.id == payload["category_id"]).first():
+            raise HTTPException(status_code=404, detail="Catégorie cible introuvable.")
+    for field, value in payload.items():
         setattr(p, field, value)
 
     db.commit()
@@ -548,18 +586,31 @@ def list_categories(
     db:    Session = Depends(get_db),
     admin: User    = Depends(get_admin_user),
 ):
-    cats = db.query(Category).order_by(Category.name).all()
+    """OPTIMISATION : récupère le product_count via un LEFT JOIN + GROUP BY,
+    ce qui évite d'appeler /panel/products juste pour compter côté front."""
+    rows = (
+        db.query(
+            Category,
+            func.count(Product.id).label("product_count"),
+        )
+        .outerjoin(Product, Product.category_id == Category.id)
+        .group_by(Category.id)
+        .order_by(Category.name)
+        .all()
+    )
     return [
         {
-            "id":           c.id,
-            "name":         c.name,
-            "slug":         c.slug,
-            "service_type": c.service_type,
-            "parent_id":    c.parent_id,
-            "is_active":    c.is_active,
-            "image_path":   c.image_path,
+            "id":            c.id,
+            "name":          c.name,
+            "slug":          c.slug,
+            "description":   c.description,
+            "service_type":  c.service_type,
+            "parent_id":     c.parent_id,
+            "is_active":     c.is_active,
+            "image_path":    c.image_path,
+            "product_count": int(count),
         }
-        for c in cats
+        for c, count in rows
     ]
 
 
@@ -591,9 +642,17 @@ def update_category(
     cat = db.query(Category).filter(Category.id == category_id).first()
     if not cat:
         raise HTTPException(status_code=404, detail="Catégorie introuvable.")
-    for field, value in data.model_dump(exclude_none=True).items():
+    # `exclude_unset=True` au lieu de `exclude_none=True` :
+    # permet de remettre `parent_id` à None pour détacher une sous-catégorie,
+    # tout en ignorant les champs absents de la requête.
+    payload = data.model_dump(exclude_unset=True)
+    if payload.get("parent_id") == category_id:
+        raise HTTPException(status_code=400, detail="Une catégorie ne peut pas être son propre parent.")
+    for field, value in payload.items():
         setattr(cat, field, value)
     db.commit()
+    db.refresh(cat)
+    logger.info(f"Catégorie mise à jour | id={category_id} | admin_id={admin.id}")
     return {"message": "Catégorie mise à jour."}
 
 
@@ -714,14 +773,18 @@ def delete_user(
 
 @router.get("/imports")
 def list_imports(
-    status: str | None = Query(None),
-    db:     Session    = Depends(get_db),
-    admin:  User       = Depends(get_admin_user),
+    status:   str | None = Query(None),
+    page:     int        = Query(1, ge=1),
+    per_page: int        = Query(100, ge=1, le=500),
+    db:       Session    = Depends(get_db),
+    admin:    User       = Depends(get_admin_user),
 ):
-    """Liste les demandes d'import.
+    """Liste paginée des demandes d'import.
 
     OPTIMISATION N+1 : joinedload(ImportRequest.user) charge les emails
     en une seule JOIN au lieu d'une requête par ligne.
+    OPTIMISATION : pagination par défaut 100 (au lieu de tout renvoyer).
+    Format de réponse : { items, total, page, per_page }.
     """
     q = (
         db.query(ImportRequest)
@@ -729,8 +792,15 @@ def list_imports(
     )
     if status:
         q = q.filter(ImportRequest.status == status)
-    imports = q.order_by(ImportRequest.created_at.desc()).all()
-    return [
+
+    total = q.with_entities(func.count(ImportRequest.id)).scalar() or 0
+    imports = (
+        q.order_by(ImportRequest.created_at.desc())
+         .offset((page - 1) * per_page)
+         .limit(per_page)
+         .all()
+    )
+    items = [
         {
             "id":                  r.id,
             "user_id":             r.user_id,
@@ -750,6 +820,7 @@ def list_imports(
         }
         for r in imports
     ]
+    return {"total": total, "page": page, "per_page": per_page, "items": items}
 
 
 @router.put("/imports/{import_id}/status")
@@ -928,4 +999,3 @@ def update_featured_products(
         "message":     f"{len(cleaned)} produit(s) en Hot Now.",
         "product_ids": cleaned,
     }
-

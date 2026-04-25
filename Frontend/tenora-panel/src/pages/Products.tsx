@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Search, Pencil, Trash2, ImageIcon, Package } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ImageIcon, Package, Infinity as InfinityIcon } from "lucide-react";
 import { PageHeader } from "@/components/panel/PageHeader";
 import { StatusBadge } from "@/components/panel/StatusBadge";
 import { DataCard, DataCardHeader, DataCardContent } from "@/components/panel/DataCard";
@@ -21,17 +21,41 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import api from "@/lib/api/client";
 
+interface RequiredField {
+  key: string;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  regex?: string;
+}
+
 interface Product {
   id: number; name: string; description?: string; price: number;
   stock?: number | null; is_active: boolean;
   image_path?: string; category_id?: number; category_name?: string;
   whatsapp_redirect?: boolean;
+  discount_percent?: number | null;
+  required_fields?: RequiredField[] | null;
 }
 interface Cat { id: number; name: string; }
 
-const empty = {
+interface FormState {
+  name: string;
+  price: number;
+  description: string;
+  category_id: string;
+  stock: string;                  // "" = illimité
+  is_active: boolean;
+  whatsapp_redirect: boolean;
+  discount_percent: string;       // "" = pas de promo
+  required_fields: RequiredField[];
+}
+
+const empty: FormState = {
   name: "", price: 0, description: "", category_id: "",
   stock: "", is_active: true, whatsapp_redirect: false,
+  discount_percent: "",
+  required_fields: [],
 };
 
 const imgUrl = (p?: string) => {
@@ -41,6 +65,9 @@ const imgUrl = (p?: string) => {
   return `${base}/uploads/${p}`;
 };
 
+// Règle métier : stock null OU 0 = ILLIMITÉ
+const isUnlimited = (s?: number | null) => s == null || s === 0;
+
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
@@ -48,7 +75,7 @@ export default function Products() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState<FormState>(empty);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -85,11 +112,16 @@ export default function Products() {
   const openEdit = (p: Product) => {
     setEditing(p);
     setForm({
-      name: p.name || "", price: p.price || 0, description: p.description || "",
+      name: p.name || "",
+      price: p.price || 0,
+      description: p.description || "",
       category_id: p.category_id?.toString() || "",
-      stock: p.stock?.toString() || "",
+      // En édition, on affiche le vrai stock (même 0). 0 reste interprété comme illimité au save.
+      stock: p.stock != null ? String(p.stock) : "",
       is_active: p.is_active ?? true,
       whatsapp_redirect: p.whatsapp_redirect ?? false,
+      discount_percent: p.discount_percent != null ? String(p.discount_percent) : "",
+      required_fields: Array.isArray(p.required_fields) ? p.required_fields : [],
     });
     setPendingImage(null);
     setImagePreview(p.image_path ? imgUrl(p.image_path) : null);
@@ -99,6 +131,25 @@ export default function Products() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const stockNum = form.stock === "" ? null : Number(form.stock);
+      const discount = form.discount_percent === "" ? null : Number(form.discount_percent);
+
+      if (discount != null && (discount <= 0 || discount >= 100)) {
+        toast.error("La réduction doit être entre 1 et 99%");
+        setSaving(false);
+        return;
+      }
+
+      const cleanFields = form.required_fields
+        .filter((f) => f.key.trim() && f.label.trim())
+        .map((f) => ({
+          key: f.key.trim(),
+          label: f.label.trim(),
+          placeholder: f.placeholder || undefined,
+          required: f.required ?? true,
+          regex: f.regex || undefined,
+        }));
+
       const payload: Record<string, unknown> = {
         name: form.name,
         description: form.description,
@@ -106,16 +157,19 @@ export default function Products() {
         whatsapp_redirect: form.whatsapp_redirect,
         price: Number(form.price) || 0,
         category_id: form.category_id ? Number(form.category_id) : null,
-        stock: form.stock ? Number(form.stock) : null,
+        // null = illimité côté DB
+        stock: stockNum,
+        discount_percent: discount,
+        required_fields: cleanFields,
       };
       if (editing) {
         await updateProduct(editing.id, payload);
         if (pendingImage) await uploadProductImage(editing.id, pendingImage);
-        toast.success("Produit mis a jour");
+        toast.success("Produit mis à jour");
       } else {
         const { data } = await createProduct(payload);
         if (pendingImage && data?.id) await uploadProductImage(data.id, pendingImage);
-        toast.success("Produit cree");
+        toast.success("Produit créé");
       }
       setShowForm(false);
       load();
@@ -130,7 +184,7 @@ export default function Products() {
     if (!toDelete) return;
     try {
       await deleteProduct(toDelete.id);
-      toast.success("Produit supprime");
+      toast.success("Produit supprimé");
       load();
     } catch {
       toast.error("Erreur lors de la suppression");
@@ -138,6 +192,22 @@ export default function Products() {
       setDelDialog(false); setToDelete(null);
     }
   };
+
+  // Required-fields helpers
+  const addField = () => setForm((f) => ({
+    ...f,
+    required_fields: [...f.required_fields, { key: "", label: "", required: true }],
+  }));
+  const updateField = (i: number, patch: Partial<RequiredField>) =>
+    setForm((f) => ({
+      ...f,
+      required_fields: f.required_fields.map((rf, idx) => idx === i ? { ...rf, ...patch } : rf),
+    }));
+  const removeField = (i: number) =>
+    setForm((f) => ({
+      ...f,
+      required_fields: f.required_fields.filter((_, idx) => idx !== i),
+    }));
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -149,11 +219,11 @@ export default function Products() {
 
       <DataCard>
         <DataCardHeader>
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 min-w-0 sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher..." className="pl-9 h-9 rounded-none border-2 mono text-xs" />
           </div>
-          <span className="chip border-border ml-auto">{filtered.length}</span>
+          <span className="chip border-border ml-auto shrink-0">{filtered.length}</span>
         </DataCardHeader>
 
         <DataCardContent>
@@ -166,57 +236,74 @@ export default function Products() {
             </div>
           ) : (
             <div className="divide-y-2 divide-border">
-              {filtered.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 hover:bg-muted/30 transition-colors">
-                  {p.image_path ? (
-                    <img src={imgUrl(p.image_path)} alt={p.name} className="h-12 w-12 object-cover border-2 border-border shrink-0" />
-                  ) : (
-                    <div className="h-12 w-12 border-2 border-border bg-muted flex items-center justify-center shrink-0">
-                      <ImageIcon className="h-4 w-4 text-muted-foreground" />
+              {filtered.map((p) => {
+                const unlimited = isUnlimited(p.stock);
+                return (
+                  <div
+                    key={p.id}
+                    className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors"
+                  >
+                    {p.image_path ? (
+                      <img src={imgUrl(p.image_path)} alt={p.name} className="h-12 w-12 object-cover border-2 border-border shrink-0" />
+                    ) : (
+                      <div className="h-12 w-12 border-2 border-border bg-muted flex items-center justify-center shrink-0">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0 basis-[60%] sm:basis-auto">
+                      <p className="text-sm font-semibold truncate">{p.name}</p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        {p.category_name && (
+                          <span className="chip border-tertiary/40 text-tertiary bg-tertiary-soft">{p.category_name}</span>
+                        )}
+                        {unlimited ? (
+                          <span className="chip border-primary/40 text-primary bg-primary-soft inline-flex items-center gap-1">
+                            <InfinityIcon className="h-3 w-3" /> stock
+                          </span>
+                        ) : (
+                          <span className={cn(
+                            "chip",
+                            (p.stock as number) < 5
+                              ? "border-warning/40 text-warning"
+                              : "border-success/40 text-success"
+                          )}>
+                            {p.stock} en stock
+                          </span>
+                        )}
+                        {p.discount_percent != null && p.discount_percent > 0 && (
+                          <span className="chip border-destructive/40 text-destructive">
+                            -{p.discount_percent}%
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{p.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {p.category_name && (
-                        <span className="chip border-tertiary/40 text-tertiary bg-tertiary-soft">{p.category_name}</span>
-                      )}
-                      {p.stock != null && (
-                        <span className={cn(
-                          "chip",
-                          p.stock === 0 ? "border-destructive/40 text-destructive" :
-                          p.stock < 5 ? "border-warning/40 text-warning" :
-                          "border-success/40 text-success"
-                        )}>
-                          {p.stock} stk
-                        </span>
-                      )}
+
+                    {/* Bloc droite — wrap entier sur mobile */}
+                    <div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0 flex-wrap justify-end">
+                      <p className="display text-base sm:text-lg text-primary mono">{fmt(p.price)}</p>
+                      <StatusBadge status={p.is_active ? "active" : "inactive"} />
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-none hover:bg-primary hover:text-primary-foreground" onClick={() => openEdit(p)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-none hover:bg-destructive hover:text-destructive-foreground" onClick={() => { setToDelete(p); setDelDialog(true); }}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                  <div className="hidden sm:block text-right">
-                    <p className="display text-lg text-primary">{fmt(p.price)}</p>
-                  </div>
-                  <StatusBadge status={p.is_active ? "active" : "inactive"} />
-                  <div className="flex items-center gap-1">
-                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-none hover:bg-primary hover:text-primary-foreground" onClick={() => openEdit(p)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-none hover:bg-destructive hover:text-destructive-foreground" onClick={() => { setToDelete(p); setDelDialog(true); }}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </DataCardContent>
       </DataCard>
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="rounded-none border-2 max-w-xl max-h-[92vh] overflow-y-auto">
+        <DialogContent className="rounded-none border-2 max-w-xl max-h-[92vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full">
           <DialogHeader>
             <DialogTitle className="mono uppercase tracking-wider text-sm">
-              // {editing ? "Edition" : "Creation"} produit
+              // {editing ? "Édition" : "Création"} produit
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -224,29 +311,53 @@ export default function Products() {
               <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Nom</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-none border-2 mono" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Prix (F)</Label>
-                <Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="rounded-none border-2 mono" />
+                <Input type="number" inputMode="numeric" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="rounded-none border-2 mono" />
               </div>
               <div>
-                <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Stock</Label>
-                <Input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="Illimite" className="rounded-none border-2 mono" />
+                <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  Stock <span className="text-muted-foreground/70">(0 = ∞)</span>
+                </Label>
+                <Input
+                  type="number" inputMode="numeric" min={0}
+                  value={form.stock}
+                  onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                  placeholder="Illimité"
+                  className="rounded-none border-2 mono"
+                />
+              </div>
+              <div>
+                <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  Réduction %
+                </Label>
+                <Input
+                  type="number" inputMode="numeric" min={0} max={99}
+                  value={form.discount_percent}
+                  onChange={(e) => setForm({ ...form, discount_percent: e.target.value })}
+                  placeholder="0"
+                  className="rounded-none border-2 mono"
+                />
               </div>
             </div>
+
             <div>
-              <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Categorie</Label>
+              <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Catégorie</Label>
               <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
-                <SelectTrigger className="rounded-none border-2 mono"><SelectValue placeholder="Selectionner" /></SelectTrigger>
+                <SelectTrigger className="rounded-none border-2 mono"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                 <SelectContent className="rounded-none border-2">
                   {cats.map((c) => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+
             <div>
               <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Description</Label>
               <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="rounded-none border-2 mono text-sm" />
             </div>
+
             <div>
               <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Image</Label>
               {imagePreview ? (
@@ -263,7 +374,38 @@ export default function Products() {
                 }} className="rounded-none border-2 mono text-xs file:mr-2 file:border-0 file:bg-primary file:text-primary-foreground file:px-3 file:py-1 file:font-bold file:uppercase file:tracking-wider file:text-[10px]" />
               )}
             </div>
-            <div className="flex items-center justify-between border-t-2 border-border pt-4">
+
+            {/* Champs requis dynamiques (required_fields) */}
+            <div className="border-t-2 border-border pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="eyebrow" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  // Champs demandés au client
+                </Label>
+                <Button type="button" size="sm" variant="outline" className="rounded-none border-2 mono uppercase text-[10px] tracking-wider" onClick={addField}>
+                  <Plus className="h-3 w-3 mr-1" /> Ajouter
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {form.required_fields.length === 0 && (
+                  <p className="text-xs text-muted-foreground mono">// Aucun champ supplémentaire</p>
+                )}
+                {form.required_fields.map((rf, i) => (
+                  <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-center border-2 border-border p-2">
+                    <Input placeholder="key (ex: phone)" value={rf.key} onChange={(e) => updateField(i, { key: e.target.value })} className="rounded-none border-2 mono text-xs h-8" />
+                    <Input placeholder="Label (ex: Téléphone)" value={rf.label} onChange={(e) => updateField(i, { label: e.target.value })} className="rounded-none border-2 mono text-xs h-8" />
+                    <label className="flex items-center gap-1 mono text-[10px] uppercase tracking-wider">
+                      <Switch checked={rf.required ?? true} onCheckedChange={(v) => updateField(i, { required: v })} />
+                      Req
+                    </label>
+                    <Button type="button" size="icon" variant="ghost" className="h-8 w-8 rounded-none hover:bg-destructive hover:text-destructive-foreground" onClick={() => removeField(i)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 justify-between border-t-2 border-border pt-4">
               <div className="flex items-center gap-2">
                 <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
                 <Label className="mono text-xs uppercase tracking-wider">Actif</Label>
@@ -274,10 +416,10 @@ export default function Products() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" className="rounded-none border-2" onClick={() => setShowForm(false)}>Annuler</Button>
-            <Button onClick={handleSave} disabled={saving} className="rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider hover:bg-primary/90">
-              {saving ? "..." : editing ? "Enregistrer" : "Creer"}
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="rounded-none border-2 w-full sm:w-auto" onClick={() => setShowForm(false)}>Annuler</Button>
+            <Button onClick={handleSave} disabled={saving} className="rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider hover:bg-primary/90 w-full sm:w-auto">
+              {saving ? "..." : editing ? "Enregistrer" : "Créer"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -288,7 +430,7 @@ export default function Products() {
           <AlertDialogHeader>
             <AlertDialogTitle className="mono uppercase tracking-wider">// Supprimer ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Le produit "{toDelete?.name}" sera definitivement supprime.
+              Le produit "{toDelete?.name}" sera définitivement supprimé.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

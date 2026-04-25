@@ -1,6 +1,11 @@
 import api from "./client";
 
-export const getProducts = () => api.get("/panel/products");
+/** Liste paginée + filtrée des produits.
+ *  Compatible avec l'ancien backend (qui renvoie `[]` brut) ET le nouveau
+ *  (qui renvoie `{ products, total, page, per_page }`). */
+export const getProducts = (params?: Record<string, unknown>) =>
+  api.get("/panel/products", { params });
+
 export const createProduct = (data: Record<string, unknown>) =>
   api.post("/panel/products", data);
 export const updateProduct = (id: number, data: Record<string, unknown>) =>

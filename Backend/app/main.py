@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
@@ -81,7 +82,21 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONR
 
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_FOLDER), name="uploads")
+
+
+# ── Static uploads avec cache navigateur 24 h ────────────────────────────────
+# Les images de produits/catégories sont quasi-immuables → on laisse le navigateur
+# les garder. Quand on remplace une image, l'URL change (nouveau path) donc pas
+# de problème de stale-cache.
+class CachedStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=86400, immutable"
+        return response
+
+
+app.mount("/uploads", CachedStaticFiles(directory=settings.UPLOAD_FOLDER), name="uploads")
 
 
 # ─── Handler 500 — masque les détails en prod ─────────────────────────────────
@@ -130,6 +145,10 @@ async def security_headers(request: Request, call_next):
         logger.warning(f"SLOW {request.method} {request.url.path} | {process_time:.2f}s")
     return response
 
+
+# ── GZip — compresse toutes les réponses JSON > 500 octets ───────────────────
+# Gain typique sur les listes (orders, products) : -75% de payload réseau.
+app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY, https_only=not settings.DEBUG, same_site="lax")
 app.add_middleware(

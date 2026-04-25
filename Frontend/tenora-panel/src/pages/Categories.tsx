@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Plus, Search, Pencil, Trash2, FolderTree, ImageIcon } from "lucide-react";
 import { PageHeader } from "@/components/panel/PageHeader";
 import { DataCard, DataCardHeader, DataCardContent } from "@/components/panel/DataCard";
@@ -11,6 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -31,11 +34,28 @@ interface Category {
   is_active: boolean;
   image_path?: string;
   product_count?: number;
+  parent_id?: number | null;
+  service_type?: string;
 }
 
-const empty = { name: "", slug: "", description: "", is_active: true };
+const SERVICE_TYPES = [
+  { value: "none",     label: "Aucun" },
+  { value: "ebook",    label: "Ebook (PDF)" },
+  { value: "physical", label: "Produit physique" },
+  { value: "digital",  label: "Service numérique" },
+];
 
-const slugify = (s: string) => s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const empty = {
+  name: "",
+  slug: "",
+  description: "",
+  is_active: true,
+  parent_id: "none" as string,    // "none" = pas de parent
+  service_type: "none" as string,
+};
+
+const slugify = (s: string) => s.toLowerCase().trim().normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 const imgUrl = (p?: string) => {
   if (!p) return "";
@@ -74,6 +94,29 @@ export default function Categories() {
 
   const filtered = items.filter((c) => c.name?.toLowerCase().includes(search.toLowerCase()));
 
+  // Map id -> name pour afficher le nom du parent dans la liste
+  const nameById = useMemo(() => {
+    const m = new Map<number, string>();
+    items.forEach((c) => m.set(c.id, c.name));
+    return m;
+  }, [items]);
+
+  // Liste des parents possibles (exclut soi-même et ses descendants)
+  const parentChoices = useMemo(() => {
+    if (!editing) return items;
+    const banned = new Set<number>([editing.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      items.forEach((c) => {
+        if (c.parent_id && banned.has(c.parent_id) && !banned.has(c.id)) {
+          banned.add(c.id); changed = true;
+        }
+      });
+    }
+    return items.filter((c) => !banned.has(c.id));
+  }, [items, editing]);
+
   const openCreate = () => {
     setEditing(null); setForm(empty); setSlugManual(false);
     setPendingImage(null); setImagePreview(null);
@@ -81,9 +124,17 @@ export default function Categories() {
   };
   const openEdit = (c: Category) => {
     setEditing(c);
-    setForm({ name: c.name || "", slug: c.slug || "", description: c.description || "", is_active: c.is_active });
+    setForm({
+      name: c.name || "",
+      slug: c.slug || "",
+      description: c.description || "",
+      is_active: c.is_active,
+      parent_id: c.parent_id ? String(c.parent_id) : "none",
+      service_type: c.service_type || "none",
+    });
     setSlugManual(true);
-    setPendingImage(null); setImagePreview(c.image_path ? imgUrl(c.image_path) : null);
+    setPendingImage(null);
+    setImagePreview(c.image_path ? imgUrl(c.image_path) : null);
     setShowForm(true);
   };
 
@@ -101,7 +152,7 @@ export default function Categories() {
   const handleRemoveImage = async () => {
     if (editing && editing.image_path) {
       await deleteCategoryImage(editing.id);
-      toast.success("Image supprimee");
+      toast.success("Image supprimée");
       load();
     }
     setPendingImage(null); setImagePreview(null);
@@ -110,14 +161,22 @@ export default function Categories() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const payload: Record<string, unknown> = {
+        name: form.name,
+        slug: form.slug,
+        description: form.description || null,
+        is_active: form.is_active,
+        service_type: form.service_type,
+        parent_id: form.parent_id === "none" ? null : Number(form.parent_id),
+      };
       if (editing) {
-        await updateCategory(editing.id, { ...form });
+        await updateCategory(editing.id, payload);
         if (pendingImage) await uploadCategoryImage(editing.id, pendingImage);
-        toast.success("Categorie mise a jour");
+        toast.success("Catégorie mise à jour");
       } else {
-        const { data } = await createCategory({ ...form });
+        const { data } = await createCategory(payload);
         if (pendingImage && data?.id) await uploadCategoryImage(data.id, pendingImage);
-        toast.success("Categorie creee");
+        toast.success("Catégorie créée");
       }
       setShowForm(false);
       load();
@@ -132,7 +191,7 @@ export default function Categories() {
     if (!toDelete) return;
     try {
       await deleteCategory(toDelete.id);
-      toast.success("Categorie supprimee");
+      toast.success("Catégorie supprimée");
       load();
     } catch {
       toast.error("Erreur lors de la suppression");
@@ -143,7 +202,7 @@ export default function Categories() {
 
   return (
     <div className="space-y-6 animate-fade-up">
-      <PageHeader eyebrow="Catalogue" title="Categories" subtitle={`// ${items.length} categorie(s)`}>
+      <PageHeader eyebrow="Catalogue" title="Catégories" subtitle={`// ${items.length} catégorie(s)`}>
         <Button onClick={openCreate} className="h-9 rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider text-xs hover:bg-primary/90">
           <Plus className="h-4 w-4 mr-2" /> Nouvelle
         </Button>
@@ -151,11 +210,11 @@ export default function Categories() {
 
       <DataCard>
         <DataCardHeader>
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 min-w-0 sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher..." className="pl-9 h-9 rounded-none border-2 mono text-xs" />
           </div>
-          <span className="chip border-border ml-auto">{filtered.length} entrees</span>
+          <span className="chip border-border ml-auto shrink-0">{filtered.length} entrées</span>
         </DataCardHeader>
 
         <DataCardContent>
@@ -164,7 +223,7 @@ export default function Categories() {
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <FolderTree className="h-8 w-8 mb-2" />
-              <p className="text-sm mono">// Aucune categorie</p>
+              <p className="text-sm mono">// Aucune catégorie</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
@@ -172,25 +231,37 @@ export default function Categories() {
                 <div key={c.id} className="brut-card brut-card-hover p-4 group">
                   <div className="flex items-start gap-3 mb-3">
                     {c.image_path ? (
-                      <img src={imgUrl(c.image_path)} alt={c.name} className="h-14 w-14 object-cover border-2 border-border" />
+                      <img src={imgUrl(c.image_path)} alt={c.name} className="h-14 w-14 object-cover border-2 border-border shrink-0" />
                     ) : (
-                      <div className="h-14 w-14 border-2 border-border bg-muted flex items-center justify-center">
+                      <div className="h-14 w-14 border-2 border-border bg-muted flex items-center justify-center shrink-0">
                         <ImageIcon className="h-5 w-5 text-muted-foreground" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="display text-base truncate">{c.name}</p>
                       <p className="mono text-[10px] text-muted-foreground truncate">/{c.slug}</p>
+                      {c.parent_id && nameById.get(c.parent_id) && (
+                        <p className="mono text-[10px] text-muted-foreground truncate mt-0.5">
+                          ↳ {nameById.get(c.parent_id)}
+                        </p>
+                      )}
                     </div>
-                    <span className={`status-dot ${c.is_active ? "bg-success text-success" : "bg-muted-foreground text-muted-foreground"}`} />
+                    <span className={`status-dot shrink-0 ${c.is_active ? "bg-success text-success" : "bg-muted-foreground text-muted-foreground"}`} />
                   </div>
                   {c.description && (
                     <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{c.description}</p>
                   )}
-                  <div className="flex items-center justify-between border-t-2 border-border pt-3">
-                    <span className="chip border-tertiary/40 text-tertiary bg-tertiary-soft">
-                      {c.product_count ?? 0} produits
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t-2 border-border pt-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="chip border-tertiary/40 text-tertiary bg-tertiary-soft">
+                        {c.product_count ?? 0} produits
+                      </span>
+                      {c.service_type && c.service_type !== "none" && (
+                        <span className="chip border-border text-muted-foreground">
+                          {c.service_type}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1">
                       <Button size="icon" variant="ghost" className="h-7 w-7 rounded-none hover:bg-primary hover:text-primary-foreground" onClick={() => openEdit(c)}>
                         <Pencil className="h-3.5 w-3.5" />
@@ -208,10 +279,10 @@ export default function Categories() {
       </DataCard>
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="rounded-none border-2 max-w-lg">
+        <DialogContent className="rounded-none border-2 max-w-lg max-h-[92vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full">
           <DialogHeader>
             <DialogTitle className="mono uppercase tracking-wider text-sm">
-              // {editing ? "Edition" : "Creation"} categorie
+              // {editing ? "Édition" : "Création"} catégorie
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -223,6 +294,37 @@ export default function Categories() {
               <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Slug</Label>
               <Input value={form.slug} onChange={(e) => { setSlugManual(true); setForm({ ...form, slug: e.target.value }); }} className="rounded-none border-2 mono" />
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  Catégorie parente
+                </Label>
+                <Select value={form.parent_id} onValueChange={(v) => setForm({ ...form, parent_id: v })}>
+                  <SelectTrigger className="rounded-none border-2 mono"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-none border-2">
+                    <SelectItem value="none">— Aucune (racine) —</SelectItem>
+                    {parentChoices.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  Type de service
+                </Label>
+                <Select value={form.service_type} onValueChange={(v) => setForm({ ...form, service_type: v })}>
+                  <SelectTrigger className="rounded-none border-2 mono"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-none border-2">
+                    {SERVICE_TYPES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div>
               <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Description</Label>
               <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="rounded-none border-2 mono text-sm" />
@@ -245,10 +347,10 @@ export default function Categories() {
               <Label className="mono text-xs uppercase tracking-wider">Active</Label>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" className="rounded-none border-2" onClick={() => setShowForm(false)}>Annuler</Button>
-            <Button onClick={handleSave} disabled={saving} className="rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider hover:bg-primary/90">
-              {saving ? "..." : editing ? "Enregistrer" : "Creer"}
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="rounded-none border-2 w-full sm:w-auto" onClick={() => setShowForm(false)}>Annuler</Button>
+            <Button onClick={handleSave} disabled={saving} className="rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider hover:bg-primary/90 w-full sm:w-auto">
+              {saving ? "..." : editing ? "Enregistrer" : "Créer"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -259,7 +361,7 @@ export default function Categories() {
           <AlertDialogHeader>
             <AlertDialogTitle className="mono uppercase tracking-wider">// Supprimer ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irreversible. La categorie "{toDelete?.name}" sera definitivement supprimee.
+              Cette action est irréversible. La catégorie "{toDelete?.name}" sera définitivement supprimée.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
