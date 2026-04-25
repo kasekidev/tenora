@@ -1,6 +1,13 @@
 import api from "./client";
 
+/**
+ * Liste des catégories — compatible:
+ *   • ANCIEN backend : `[{ id, name, ... }]` sans product_count
+ *   • NOUVEAU backend : `[{ id, name, ..., product_count }]` (LEFT JOIN GROUP BY)
+ * Aucune transformation nécessaire car `product_count` est juste un champ en plus.
+ */
 export const getCategories = () => api.get("/panel/categories");
+
 export const createCategory = (data: Record<string, unknown>) =>
   api.post("/panel/categories", data);
 export const updateCategory = (id: number, data: Record<string, unknown>) =>

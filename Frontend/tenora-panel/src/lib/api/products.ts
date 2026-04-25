@@ -1,10 +1,38 @@
 import api from "./client";
 
-/** Liste paginée + filtrée des produits.
- *  Compatible avec l'ancien backend (qui renvoie `[]` brut) ET le nouveau
- *  (qui renvoie `{ products, total, page, per_page }`). */
-export const getProducts = (params?: Record<string, unknown>) =>
-  api.get("/panel/products", { params });
+/**
+ * Liste des produits — compatible:
+ *   • ANCIEN backend : renvoie un tableau brut `[]`
+ *   • NOUVEAU backend (paginé) : renvoie `{ products, total, page, per_page }`
+ *
+ * On normalise TOUJOURS vers un tableau côté client pour que les composants
+ * existants (Products.tsx, FeaturedProductsManager.tsx) continuent de marcher
+ * sans modif. Les métadonnées de pagination sont attachées sur l'objet retourné
+ * via `meta` pour les futurs usages.
+ */
+export const getProducts = async (params?: Record<string, unknown>) => {
+  const res = await api.get("/panel/products", { params });
+  const raw = res.data;
+
+  if (Array.isArray(raw)) {
+    return { ...res, data: raw, meta: { total: raw.length, page: 1, per_page: raw.length } };
+  }
+
+  if (raw && Array.isArray(raw.products)) {
+    return {
+      ...res,
+      data: raw.products,
+      meta: {
+        total: raw.total ?? raw.products.length,
+        page: raw.page ?? 1,
+        per_page: raw.per_page ?? raw.products.length,
+      },
+    };
+  }
+
+  // Fallback ultra-défensif : jamais undefined.
+  return { ...res, data: [], meta: { total: 0, page: 1, per_page: 0 } };
+};
 
 export const createProduct = (data: Record<string, unknown>) =>
   api.post("/panel/products", data);
