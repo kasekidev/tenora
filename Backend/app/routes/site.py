@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.product import Product
-from app.schemas.product import ProductResponse
+from app.schemas.schemas_product import ProductResponse
 from app.services.settings_service import (
     DEFAULT_ANNOUNCEMENT,
     DEFAULT_PAYMENT_METHODS,
