@@ -240,7 +240,7 @@ export function FeaturedProductsManager() {
           </ol>
         )}
 
-        {selected.some((p) => !p.is_active || p.stock === 0) && (
+        {selected.some((p) => !p.is_active) && (
           <div className="mt-3 flex items-center gap-2 border-2 border-warning/40 bg-warning-soft p-3 text-xs text-warning mono">
             <AlertCircle className="h-4 w-4" />
             Certains produits selectionnes sont inactifs ou en rupture — ils ne
