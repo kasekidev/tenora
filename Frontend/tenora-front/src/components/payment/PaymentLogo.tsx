@@ -3,58 +3,103 @@
 // dont la couleur de fond s'adapte exactement à celle du logo SVG, afin que
 // le logo "remplisse" visuellement le cadre sans trou ni bord parasite.
 //
-// Pour USDT (pas de SVG fourni), on rend un emblème typographique stylé.
+// Robustesse :
+//  - Les SVG sont importés via Vite (URL hashée → pas de souci de casse / déploiement).
+//  - Le `methodId` envoyé par le backend est normalisé (minuscule, sans accents,
+//    sans espaces / underscores / tirets) puis mappé via une table d'alias.
+//  - Si l'ID est inconnu, on tente une heuristique sur le `name` lisible.
+//  - Dernier recours : carré neutre avec l'initiale.
 import { cn } from "@/lib/utils";
+
+// ⬇️ Imports Vite — résout les chemins à la build, immune au case-sensitivity.
+import waveSvg from "/icons/wave.svg?url";
+import airtelSvg from "/icons/airtelMoney.svg?url";
+import mynitaSvg from "/icons/Mynita.svg?url";
+import amanataSvg from "/icons/Amanata.svg?url";
+import zcashSvg from "/icons/Zcash.svg?url";
 
 type Variant = "tile" | "badge" | "thumb";
 
 interface PaymentBrand {
-  /** Image SVG (chemin public). */
   src?: string;
-  /** Couleur de fond exacte du logo (utilisée pour le cadre). */
   bg: string;
-  /** Couleur d'accent pour bordure / glow. */
   accent: string;
-  /** Pour les paiements sans logo image, fallback typographique. */
   fallback?: { glyph: string; color: string };
-  /** Padding interne — certains logos ont besoin de moins de marge. */
   pad?: string;
-  /** Logo "occupe" déjà le cadre carré complet → padding nul. */
   fullBleed?: boolean;
 }
 
 const BRANDS: Record<string, PaymentBrand> = {
-  wave:   { src: "/icons/wave.svg",        bg: "#1CC7FE", accent: "#1CC7FE", fullBleed: true },
-  airtel: { src: "/icons/airtelMoney.svg", bg: "#FFFFFF", accent: "#E40914", fullBleed: true },
-  mynita: { src: "/icons/Mynita.svg",      bg: "#FFFFFF", accent: "#0F172A", fullBleed: true },
-  amanata:{ src: "/icons/Amanata.svg",     bg: "#FFFFFF", accent: "#0F172A", fullBleed: true },
-  zcash:  { src: "/icons/Zcash.svg",       bg: "#FEE715", accent: "#F4B728", fullBleed: true },
-  usdt:   {
-    bg: "#26A17B", accent: "#26A17B",
-    fallback: { glyph: "₮", color: "#FFFFFF" },
-  },
+  wave:    { src: waveSvg,    bg: "#1CC7FE", accent: "#1CC7FE", fullBleed: true },
+  airtel:  { src: airtelSvg,  bg: "#FFFFFF", accent: "#E40914", fullBleed: true },
+  mynita:  { src: mynitaSvg,  bg: "#FFFFFF", accent: "#0F172A", fullBleed: true },
+  amanata: { src: amanataSvg, bg: "#FFFFFF", accent: "#0F172A", fullBleed: true },
+  zcash:   { src: zcashSvg,   bg: "#FEE715", accent: "#F4B728", fullBleed: true },
+  usdt:    { bg: "#26A17B", accent: "#26A17B", fallback: { glyph: "₮", color: "#FFFFFF" } },
 };
+
+// Alias : tout ce que le backend (ou un admin) pourrait écrire → clé canonique.
+const ALIASES: Record<string, keyof typeof BRANDS> = {
+  wave: "wave",
+  wavemoney: "wave",
+  wavesn: "wave",
+  airtel: "airtel",
+  airtelmoney: "airtel",
+  airtelmobile: "airtel",
+  mynita: "mynita",
+  minita: "mynita",
+  amanata: "amanata",
+  amana: "amanata",
+  zcash: "zcash",
+  zec: "zcash",
+  usdt: "usdt",
+  tether: "usdt",
+  usdttrc20: "usdt",
+  usdterc20: "usdt",
+};
+
+function normalize(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // accents
+    .replace(/[^a-z0-9]/g, "");      // espaces, _, -, …
+}
+
+function resolveBrand(methodId: string, name: string): PaymentBrand | undefined {
+  const idKey = normalize(methodId);
+  if (ALIASES[idKey]) return BRANDS[ALIASES[idKey]];
+  if (BRANDS[idKey]) return BRANDS[idKey];
+
+  const nameKey = normalize(name);
+  if (ALIASES[nameKey]) return BRANDS[ALIASES[nameKey]];
+  if (BRANDS[nameKey]) return BRANDS[nameKey];
+
+  // heuristique : sous-chaîne
+  for (const k of Object.keys(ALIASES)) {
+    if (idKey.includes(k) || nameKey.includes(k)) return BRANDS[ALIASES[k]];
+  }
+  return undefined;
+}
 
 interface Props {
   methodId: string;
-  /** Nom du moyen de paiement (alt text + fallback texte si méthode inconnue). */
   name: string;
   variant?: Variant;
   className?: string;
 }
 
 const SIZE_CLASSES: Record<Variant, string> = {
-  tile:  "size-14 sm:size-16",   // sélecteur principal sur la page produit
-  badge: "size-9",                // petit badge inline
-  thumb: "size-12",               // bande "trust" sur la home
+  tile:  "size-14 sm:size-16",
+  badge: "size-9",
+  thumb: "size-12",
 };
 
 export function PaymentLogo({ methodId, name, variant = "tile", className }: Props) {
-  const brand = BRANDS[methodId];
+  const brand = resolveBrand(methodId, name);
   const sizeCls = SIZE_CLASSES[variant];
 
   if (!brand) {
-    // Méthode inconnue → carré neutre avec initiale
     return (
       <div
         className={cn(
@@ -62,8 +107,9 @@ export function PaymentLogo({ methodId, name, variant = "tile", className }: Pro
           sizeCls,
           className,
         )}
+        title={`${name} (${methodId})`}
       >
-        {name.charAt(0).toUpperCase()}
+        {(name || methodId).charAt(0).toUpperCase()}
       </div>
     );
   }
@@ -100,7 +146,6 @@ export function PaymentLogo({ methodId, name, variant = "tile", className }: Pro
   );
 }
 
-/** Couleur d'accent utilisée par d'autres composants pour matcher la marque. */
-export function getPaymentAccent(methodId: string): string | null {
-  return BRANDS[methodId]?.accent ?? null;
+export function getPaymentAccent(methodId: string, name = ""): string | null {
+  return resolveBrand(methodId, name)?.accent ?? null;
 }
