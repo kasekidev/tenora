@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ import {
   Hash,
   Truck,
   MessageCircle,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -162,6 +163,43 @@ export default function Orders() {
       toast.error(apiMessage || "Impossible d'annuler cette commande.");
     },
   });
+
+  const [uploadingId, setUploadingId] = useState<number | null>(null);
+  const fileInputs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  const uploadMutation = useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) =>
+      ordersApi.uploadScreenshot(id, file),
+    onMutate: ({ id }) => setUploadingId(id),
+    onSuccess: () => {
+      toast.success("Reçu envoyé. Votre commande est en cours de traitement.");
+      qc.invalidateQueries({ queryKey: ["orders", "my"] });
+    },
+    onError: (error: any) => {
+      const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
+      toast.error(apiMessage || "Impossible d'envoyer le reçu.");
+    },
+    onSettled: () => setUploadingId(null),
+  });
+
+  const handlePickFile = (orderId: number) => {
+    fileInputs.current[orderId]?.click();
+  };
+
+  const handleFileChange = (orderId: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset pour permettre le re-upload du même fichier
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Fichier trop lourd — maximum 5 MB.");
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Seules les images JPG, PNG et WEBP sont acceptées.");
+      return;
+    }
+    uploadMutation.mutate({ id: orderId, file });
+  };
 
   const stats = useMemo(() => {
     const total = unified.length;
@@ -362,6 +400,30 @@ export default function Orders() {
                             <Button asChild variant="outline" size="sm" className="border-2 text-xs font-bold uppercase tracking-wider">
                               <Link to={`/produit/${o.product_id}`}>Voir le produit</Link>
                             </Button>
+                            {o.status === "pending" && (
+                              <>
+                                <input
+                                  ref={(el) => { fileInputs.current[o.id] = el; }}
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp"
+                                  className="hidden"
+                                  onChange={(e) => handleFileChange(o.id, e)}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => handlePickFile(o.id)}
+                                  disabled={uploadingId === o.id}
+                                  className="border-2 border-primary bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold uppercase tracking-wider"
+                                >
+                                  {uploadingId === o.id ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                  ) : (
+                                    <Upload className="size-4" />
+                                  )}
+                                  Envoyer le reçu
+                                </Button>
+                              </>
+                            )}
                             {canCancel && (
                               <Button
                                 variant="outline"
