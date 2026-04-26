@@ -9,6 +9,23 @@ import { useSite } from "@/context/SiteContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { HighlightedText } from "@/components/ui/HighlightedText";
+import { PaymentLogo, getPaymentAccent } from "@/components/payment/PaymentLogo";
+import { PaymentInstructions } from "@/components/payment/PaymentInstructions";
+
+/** Nettoie une description issue du backend :
+ *  - retire les espaces parasites en bord de ligne
+ *  - supprime les lignes ne contenant que de la ponctuation orpheline (".", "...", "—")
+ *  - capitalise chaque ligne (1ère lettre en majuscule) si elle commence en minuscule.
+ */
+function cleanDescription(text: string | null | undefined): string {
+  if (!text) return "";
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !/^[.\u2026\-—_*•·]+$/.test(l))
+    .map((l) => (/^[a-zàâäéèêëîïôöùûüç]/.test(l) ? l.charAt(0).toUpperCase() + l.slice(1) : l))
+    .join("\n");
+}
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -163,12 +180,15 @@ export default function ProductPage() {
         <div className="space-y-5">
           <div>
             <h1 className="font-display text-2xl md:text-3xl font-bold">{product.name}</h1>
-            {product.description && (
-              <HighlightedText
-                text={product.description}
-                className="text-muted-foreground mt-2 leading-relaxed"
-              />
-            )}
+            {product.description && (() => {
+              const desc = cleanDescription(product.description);
+              return desc ? (
+                <HighlightedText
+                  text={desc}
+                  className="text-muted-foreground mt-2 leading-relaxed"
+                />
+              ) : null;
+            })()}
           </div>
 
           <div className="flex items-baseline gap-3">
@@ -207,23 +227,50 @@ export default function ProductPage() {
                 )}
 
                 {!product.whatsapp_redirect && paymentMethods.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="font-semibold text-sm">Moyen de paiement</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {paymentMethods.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setPaymentMethod(m.id)}
-                          className={cn(
-                            "flex items-center gap-2 p-3 rounded-lg border text-left transition",
-                            paymentMethod === m.id ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
-                          )}
-                        >
-                          <span className="text-xl">{m.icon}</span>
-                          <span className="text-sm font-medium">{m.name}</span>
-                        </button>
-                      ))}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-sm">Moyen de paiement</p>
+                      {selectedMethod && (
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-primary font-mono">
+                          {selectedMethod.name} sélectionné
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {paymentMethods.map((m) => {
+                        const active = paymentMethod === m.id;
+                        const accent = getPaymentAccent(m.id);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setPaymentMethod(m.id)}
+                            aria-pressed={active}
+                            title={m.name}
+                            style={active && accent ? { borderColor: accent, boxShadow: `0 0 0 1px ${accent} inset` } : undefined}
+                            className={cn(
+                              "group relative flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all bg-background",
+                              active
+                                ? "scale-[1.02]"
+                                : "border-border hover:border-foreground/30 hover:-translate-y-0.5"
+                            )}
+                          >
+                            <PaymentLogo methodId={m.id} name={m.name} variant="tile" />
+                            <span className="text-[11px] font-semibold leading-tight text-center line-clamp-1">
+                              {m.name}
+                            </span>
+                            {active && (
+                              <span
+                                aria-hidden
+                                style={accent ? { backgroundColor: accent } : undefined}
+                                className="absolute -top-1.5 -right-1.5 size-4 rounded-full flex items-center justify-center text-[10px] text-white shadow"
+                              >
+                                <Check className="size-3" strokeWidth={3} />
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -245,10 +292,13 @@ export default function ProductPage() {
                 </div>
 
                 {selectedMethod && (
-                  <div className="rounded-lg bg-muted p-3 text-sm">
-                    <p className="font-semibold mb-1">{selectedMethod.icon} {selectedMethod.name}</p>
-                    <p className="text-muted-foreground whitespace-pre-line">{selectedMethod.instructions}</p>
-                  </div>
+                  <PaymentInstructions
+                    methodId={selectedMethod.id}
+                    methodName={selectedMethod.name}
+                    rawInstructions={selectedMethod.instructions}
+                    amountFormatted={formatXOF(order.total_price)}
+                    orderId={order.id}
+                  />
                 )}
 
                 <div>

@@ -25,28 +25,50 @@ export default function Shop() {
     return () => clearTimeout(t);
   }, [query]);
 
- const { data: tree = [], isLoading: loadingCats } = useQuery({
-  queryKey: ["categories", "tree"],
-  staleTime: 30 * 60_000,
-  gcTime: 60 * 60_000,
-  queryFn: () =>
-    productsApi.getCategoriesTree().then((r) =>
-      r.data.filter((c) => c.service_type !== "import_export")
-    ),
-});
-
-  const { data: products = [], isLoading: loadingProducts } = useQuery({
-  queryKey: ["shop", { selectedId, q: debounced }],
-  staleTime: 60_000,
-  placeholderData: keepPreviousData, // ← garde l'ancienne grille pendant le fetch
-  queryFn: () =>
-    productsApi
-      .getShopProducts({
-        category_id: selectedId ?? undefined,
-        q: debounced || undefined,
-      })
-      .then((r) => r.data),
+ // Tree COMPLET (avec import_export) – sert à calculer les IDs à exclure des produits
+  const { data: fullTree = [], isLoading: loadingCats } = useQuery({
+    queryKey: ["categories", "tree", "full"],
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    queryFn: () => productsApi.getCategoriesTree().then((r) => r.data),
   });
+
+  // Tree visible dans la sidebar : on cache les catégories import_export
+  const tree = useMemo(
+    () => fullTree.filter((c) => c.service_type !== "import_export"),
+    [fullTree]
+  );
+
+  // IDs (catégories + sous-catégories) appartenant au service import_export
+  const importExportIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const c of fullTree) {
+      if (c.service_type === "import_export") {
+        ids.add(c.id);
+        c.subcategories.forEach((s) => ids.add(s.id));
+      }
+    }
+    return ids;
+  }, [fullTree]);
+
+  const { data: rawProducts = [], isLoading: loadingProducts } = useQuery({
+    queryKey: ["shop", { selectedId, q: debounced }],
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      productsApi
+        .getShopProducts({
+          category_id: selectedId ?? undefined,
+          q: debounced || undefined,
+        })
+        .then((r) => r.data),
+  });
+
+  // Filtre côté front : on retire tout produit dont la catégorie est import/export
+  const products = useMemo(
+    () => rawProducts.filter((p) => !importExportIds.has(p.category_id)),
+    [rawProducts, importExportIds]
+  );
 
   const currentTitle = useMemo(() => {
     if (debounced) return `Recherche : « ${debounced} »`;

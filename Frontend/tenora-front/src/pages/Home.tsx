@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { productsApi } from "@/lib/api";
 import { useSite } from "@/context/SiteContext";
 import { ProductCard } from "@/components/product/ProductCard";
+import { PaymentLogo } from "@/components/payment/PaymentLogo";
 
 const services = [
   {
@@ -206,7 +207,7 @@ export default function Home() {
       {/* ========== TICKER ========== */}
       <div className="border-b-2 border-border bg-card overflow-hidden py-4 flex relative">
         <div className="flex gap-12 items-center font-display text-2xl md:text-3xl uppercase text-muted-foreground whitespace-nowrap px-8 animate-marquee w-max">
-          {[...tickerItems, ...tickerItems, ...tickerItems].map((t, i) => (
+          {[...tickerItems, ...tickerItems].map((t, i) => (
             <span key={i} className="flex items-center gap-12">
               <span className="text-foreground">{t}</span>
               <span className="text-secondary">//</span>
@@ -341,6 +342,35 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ========== TRUSTED PAYMENTS ========== */}
+      <section className="border-y-2 border-border bg-card">
+        <div className="container-app py-8 md:py-10">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="size-5 text-primary shrink-0" />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-secondary font-mono">// Paiement</p>
+                <p className="font-display text-2xl md:text-3xl font-bold uppercase leading-none mt-0.5">
+                  Méthodes acceptées
+                </p>
+              </div>
+            </div>
+            <ul className="flex flex-wrap items-center gap-3 md:gap-4">
+              {(site?.payment_methods || [])
+                .filter((m) => m.enabled)
+                .map((m) => (
+                  <li key={m.id} className="flex items-center gap-2">
+                    <PaymentLogo methodId={m.id} name={m.name} variant="thumb" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground hidden sm:inline">
+                      {m.name}
+                    </span>
+                  </li>
+                ))}
+            </ul>
           </div>
         </div>
       </section>
