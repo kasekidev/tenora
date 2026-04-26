@@ -24,10 +24,10 @@ interface PM {
 const PM_DEFS: Omit<PM, "enabled" | "instructions">[] = [
   { key: "wave", label: "Wave", desc: "Mobile money - Wave Niger" },
   { key: "airtel", label: "Airtel Money", desc: "Mobile money - Airtel Niger" },
-  { key: "mynita", label: "Mynita", desc: "Paiement mobile - Mynita" },
-  { key: "amanata", label: "Amanata", desc: "Paiement mobile - Amanata" },
+  { key: "mynita", label: "Mynita", desc: "Mobile Money - Mynita" },
+  { key: "amanata", label: "Amanata", desc: "Mobile Money - Amanata" },
   { key: "usdt", label: "USDT TRC20", desc: "Crypto - reseau Tron (TRC20)" },
-  { key: "zcash", label: "ZCash", desc: "Crypto - ZCash (ZEC)" },
+  { key: "zcash", label: "ZCash", desc: "Mobile Money - ZCash" },
 ];
 
 export default function SettingsPage() {
