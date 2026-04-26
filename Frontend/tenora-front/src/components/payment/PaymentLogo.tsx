@@ -11,13 +11,8 @@
 //  - Dernier recours : carré neutre avec l'initiale.
 import { cn } from "@/lib/utils";
 
-// ⬇️ Imports Vite — résout les chemins à la build, immune au case-sensitivity.
-import waveSvg from "/icons/wave.svg?url";
-import airtelSvg from "/icons/airtelMoney.svg?url";
-import mynitaSvg from "/icons/Mynita.svg?url";
-import amanataSvg from "/icons/Amanata.svg?url";
-import zcashSvg from "/icons/Zcash.svg?url";
-
+// On référence les SVG depuis `public/icons/` via des chemins absolus —
+// Vercel/Vite les sert tels quels (pas d'import module → pas de mauvaise URL).
 type Variant = "tile" | "badge" | "thumb";
 
 interface PaymentBrand {
@@ -30,11 +25,11 @@ interface PaymentBrand {
 }
 
 const BRANDS: Record<string, PaymentBrand> = {
-  wave:    { src: waveSvg,    bg: "#1CC7FE", accent: "#1CC7FE", fullBleed: true },
-  airtel:  { src: airtelSvg,  bg: "#FFFFFF", accent: "#E40914", fullBleed: true },
-  mynita:  { src: mynitaSvg,  bg: "#FFFFFF", accent: "#0F172A", fullBleed: true },
-  amanata: { src: amanataSvg, bg: "#FFFFFF", accent: "#0F172A", fullBleed: true },
-  zcash:   { src: zcashSvg,   bg: "#FEE715", accent: "#F4B728", fullBleed: true },
+  wave:    { src: "/icons/wave.svg",        bg: "#1CC7FE", accent: "#1CC7FE", fullBleed: true },
+  airtel:  { src: "/icons/airtelMoney.svg", bg: "#FFFFFF", accent: "#E40914", fullBleed: true },
+  mynita:  { src: "/icons/Mynita.svg",      bg: "#FFFFFF", accent: "#0F172A", fullBleed: true },
+  amanata: { src: "/icons/Amanata.svg",     bg: "#FFFFFF", accent: "#0F172A", fullBleed: true },
+  zcash:   { src: "/icons/Zcash.svg",       bg: "#FEE715", accent: "#F4B728", fullBleed: true },
   usdt:    { bg: "#26A17B", accent: "#26A17B", fallback: { glyph: "₮", color: "#FFFFFF" } },
 };
 
