@@ -1,15 +1,18 @@
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
-import resend
+import httpx
 from loguru import logger
 
 from app.config import settings
 
-resend.api_key = settings.RESEND_API_KEY
+# ─── Brevo (Sendinblue) ───────────────────────────────────────────────────────
+# Doc API : https://developers.brevo.com/reference/sendtransacemail
+_BREVO_URL     = "https://api.brevo.com/v3/smtp/email"
+_BREVO_TIMEOUT = 10.0  # secondes
 
 # Pool partagé — threads réutilisés, file d'attente intégrée.
-# max_workers=4 : 4 connexions Resend max en parallèle (ajustable).
+# max_workers=4 : 4 connexions Brevo max en parallèle (ajustable).
 _mail_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="mail")
 
 # Retry : 3 tentatives max, backoff 1 s → 2 s entre chaque échec.
@@ -28,6 +31,7 @@ def _fmt_price(price: float) -> str:
         return f"{int(price):,} FCFA".replace(",", "\u202f")
     except Exception:
         return f"{price} FCFA"
+
 
 def _get_admins() -> list[str]:
     """Liste des emails admins depuis MAIL_ADMIN (séparés par virgule)."""
@@ -53,7 +57,7 @@ class MailResult:
 
 def _send(to: str | list[str], subject: str, html: str) -> Future:
     """
-    Soumet l'envoi au pool avec retry exponentiel.
+    Soumet l'envoi au pool avec retry exponentiel via l'API HTTP Brevo.
 
     Retourne un Future[MailResult] — ignorez-le pour du fire-and-forget,
     ou appelez .result(timeout=…) dans la route si vous voulez confirmer.
@@ -61,20 +65,63 @@ def _send(to: str | list[str], subject: str, html: str) -> Future:
     recipients = to if isinstance(to, list) else [to]
 
     def _worker() -> MailResult:
+        if not settings.BREVO_API_KEY:
+            logger.error("BREVO_API_KEY manquant — email non envoyé")
+            return MailResult(ok=False, attempts=0, error="BREVO_API_KEY missing")
+        if not settings.MAIL_FROM_EMAIL:
+            logger.error("MAIL_FROM_EMAIL manquant — email non envoyé")
+            return MailResult(ok=False, attempts=0, error="MAIL_FROM_EMAIL missing")
+
+        payload = {
+            "sender": {
+                "name":  settings.MAIL_FROM_NAME or settings.APP_NAME or "Tenora",
+                "email": settings.MAIL_FROM_EMAIL,
+            },
+            "to":          [{"email": r} for r in recipients],
+            "subject":     subject,
+            "htmlContent": html,
+        }
+        headers = {
+            "accept":       "application/json",
+            "content-type": "application/json",
+            "api-key":      settings.BREVO_API_KEY,
+        }
+
         last_err: Exception | None = None
         for attempt in range(1, _MAX_ATTEMPTS + 1):
             try:
-                resend.Emails.send({
-                    "from":    settings.MAIL_FROM,
-                    "to":      recipients,
-                    "subject": subject,
-                    "html":    html,
-                })
+                resp = httpx.post(
+                    _BREVO_URL,
+                    json=payload,
+                    headers=headers,
+                    timeout=_BREVO_TIMEOUT,
+                )
+                resp.raise_for_status()
+                msg_id = ""
+                try:
+                    msg_id = resp.json().get("messageId", "")
+                except Exception:
+                    pass
                 logger.success(
-                    f"Email envoyé (tentative {attempt}/{_MAX_ATTEMPTS}) "
-                    f"| {subject} → {recipients}"
+                    f"Email envoyé via Brevo (tentative {attempt}/{_MAX_ATTEMPTS}) "
+                    f"| {subject} → {recipients} | id={msg_id}"
                 )
                 return MailResult(ok=True, attempts=attempt)
+
+            except httpx.HTTPStatusError as exc:
+                last_err = exc
+                status = exc.response.status_code
+                body   = exc.response.text[:500]
+                logger.warning(
+                    f"Tentative {attempt}/{_MAX_ATTEMPTS} échouée (HTTP {status}) "
+                    f"| {subject} → {recipients} | {body}"
+                )
+                # 4xx (sauf 429 rate-limit) = erreur métier, inutile de retry
+                if 400 <= status < 500 and status != 429:
+                    break
+                if attempt < _MAX_ATTEMPTS:
+                    time.sleep(_RETRY_DELAYS[attempt - 1])
+
             except Exception as exc:
                 last_err = exc
                 logger.warning(
@@ -85,7 +132,7 @@ def _send(to: str | list[str], subject: str, html: str) -> Future:
                     time.sleep(_RETRY_DELAYS[attempt - 1])
 
         logger.error(
-            f"Échec définitif ({_MAX_ATTEMPTS} tentatives) "
+            f"Échec définitif Brevo ({_MAX_ATTEMPTS} tentatives) "
             f"| {subject} → {recipients} | {last_err}"
         )
         return MailResult(ok=False, attempts=_MAX_ATTEMPTS, error=str(last_err))

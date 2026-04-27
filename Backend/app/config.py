@@ -29,15 +29,17 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME:       str = ""
     R2_PUBLIC_URL:        str = ""
 
-    # Emails Resend
-    RESEND_API_KEY: str = ""
-    MAIL_FROM:      str = ""
-    MAIL_ADMIN:     str = ""
+    # Emails Brevo (Sendinblue)
+    BREVO_API_KEY:   str = ""
+    MAIL_FROM:       str = ""   # legacy / log : "Tenora <noreply@tenora.store>"
+    MAIL_FROM_EMAIL: str = ""   # ex : "noreply@tenora.store"
+    MAIL_FROM_NAME:  str = "Tenora"
+    MAIL_ADMIN:      str = ""   # admins (séparés par virgule)
 
     # WhatsApp
     WHATSAPP_NUMBER: str = ""
 
-    # === Observabilité (NEW) ===
+    # === Observabilité ===
     SENTRY_DSN:                 str   = ""
     SENTRY_TRACES_SAMPLE_RATE:  float = 0.1
     SENTRY_PROFILES_SAMPLE_RATE: float = 0.0
