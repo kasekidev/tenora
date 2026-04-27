@@ -56,7 +56,7 @@ def _purge_expired_sessions(db: Session) -> None:
 
 @router.post("/register", response_model=UserResponse)
 @limiter.limit("5/minute")
-def register(data: UserRegister, request: Request, db: Session = Depends(get_db)):
+def register(data: UserRegister, response: Response, request: Request, db: Session = Depends(get_db)):
     logger.info(f"Tentative d'inscription | email={data.email} | ip={request.client.host}")
 
     existing = db.query(User).filter(User.email == data.email).first()
@@ -81,7 +81,31 @@ def register(data: UserRegister, request: Request, db: Session = Depends(get_db)
         # L'inscription réussit même si l'email OTP échoue — le user peut renvoyer
         logger.error(f"Échec envoi OTP à l'inscription | user_id={user.id} | {e}")
 
-    logger.success(f"Inscription réussie | email={data.email} | id={user.id}")
+    # ── Auto-login après inscription ──────────────────────────────────────────
+    # Crée une session immédiatement pour que l'utilisateur arrive sur la page
+    # de vérification email déjà connecté (sinon ProtectedRoute le renvoie au
+    # login et la vérif n'arrive qu'après une connexion manuelle).
+    session_duration = timedelta(days=7)
+    cookie_max_age   = 7 * 24 * 60 * 60
+    session_id = secrets.token_hex(32)
+    session = SessionModel(
+        id         = session_id,
+        user_id    = user.id,
+        expires_at = datetime.utcnow() + session_duration,
+    )
+    db.add(session)
+    db.commit()
+
+    response.set_cookie(
+        key      = "session_id",
+        value    = session_id,
+        httponly = True,
+        secure   = True,
+        samesite = "lax" if is_dev else "none",
+        max_age  = cookie_max_age,
+    )
+
+    logger.success(f"Inscription réussie + session créée | email={data.email} | id={user.id}")
     return user
 
 
