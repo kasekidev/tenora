@@ -1,13 +1,20 @@
-// Tenora — Service Worker minimal pour rendre la PWA installable.
-// Pas de cache offline agressif (pour éviter les contenus périmés).
-// Stratégie : network-first, fallback simple.
+// public/sw.js
+// Service worker minimal pour rendre le panel installable sur Android.
+// Stratégie : network-first pour la navigation (jamais de version périmée
+// dans l'admin), cache-first pour les assets statiques (icônes, manifest).
 
-const CACHE = "tenora-shell-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const CACHE = "tenora-panel-v1";
+const STATIC_ASSETS = [
+  "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-maskable-512.png",
+  "/icons/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL).catch(() => {}))
+    caches.open(CACHE).then((c) => c.addAll(STATIC_ASSETS)).catch(() => {})
   );
   self.skipWaiting();
 });
@@ -24,10 +31,15 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
 
-  // Navigation : network first, fallback cache, fallback "/"
+  const url = new URL(req.url);
+
+  // JAMAIS cacher l'API : l'admin doit voir des données fraîches.
+  if (url.pathname.startsWith("/panel") || url.pathname.startsWith("/api")) {
+    return;
+  }
+
+  // Navigation HTML : network-first, fallback cache si offline.
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req)
@@ -41,18 +53,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Assets statiques : cache first
-  if (/\.(?:png|jpg|jpeg|svg|webp|ico|woff2?|css|js)$/.test(url.pathname)) {
+  // Assets statiques : cache-first.
+  if (STATIC_ASSETS.includes(url.pathname) || url.pathname.startsWith("/icons/")) {
     event.respondWith(
-      caches.match(req).then(
-        (cached) =>
-          cached ||
-          fetch(req).then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-            return res;
-          })
-      )
+      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        return res;
+      }))
     );
   }
 });
