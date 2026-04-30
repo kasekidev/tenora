@@ -12,11 +12,16 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!accepted) {
+      setError("Vous devez accepter les conditions d'utilisation et la politique de confidentialité.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -62,7 +67,26 @@ export default function Register() {
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">8 caractères minimum.</p>
           </div>
-          <Button type="submit" disabled={loading} size="lg" className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow">
+          <label className="flex items-start gap-2.5 text-xs text-muted-foreground leading-relaxed cursor-pointer select-none border-2 border-border hover:border-primary/60 transition-colors p-3">
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+              className="mt-0.5 size-4 accent-primary cursor-pointer shrink-0"
+            />
+            <span>
+              En m'inscrivant, j'accepte la{" "}
+              <Link to="/legal#confidentialite" target="_blank" className="text-primary font-bold hover:underline">
+                politique de confidentialité
+              </Link>{" "}
+              et les{" "}
+              <Link to="/legal#conditions" target="_blank" className="text-primary font-bold hover:underline">
+                conditions d'utilisation
+              </Link>{" "}
+              de Tenora.
+            </span>
+          </label>
+          <Button type="submit" disabled={loading || !accepted} size="lg" className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow disabled:opacity-50">
             {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />} Créer mon compte
           </Button>
         </form>

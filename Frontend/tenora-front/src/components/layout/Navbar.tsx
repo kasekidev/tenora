@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Menu, ShoppingBag, User, LogOut, Package, BookOpen, Truck, X } from "lucide-react";
+import { Menu, ShoppingBag, User, LogOut, Package, BookOpen, Truck } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -84,7 +84,6 @@ export function Navbar() {
             <SheetContent side="right" className="w-[88%] max-w-sm p-0 bg-sidebar border-l-2 border-sidebar-border">
               <div className="flex items-center justify-between p-4 border-b-2 border-sidebar-border">
                 <TenoraLogo className="text-xl" />
-                <Button variant="ghost" size="icon" onClick={() => setOpen(false)}><X className="size-5" /></Button>
               </div>
               <div className="p-3 space-y-1">
                 {links.map((l) => (
