@@ -4,7 +4,8 @@ export function TenoraLogo({ className = "", showDot = true }: { className?: str
     <span
       className={`font-display font-bold uppercase tracking-[0.08em] leading-none select-none ${className}`}
     >
-      Tenora{showDot && <span className="text-primary">.</span>}
+      <span className="group-hover:text-primary transition-colors duration-200">Tenora</span>
+      {showDot && <span className="text-primary group-hover:text-foreground transition-colors duration-200">.</span>}
     </span>
   );
 }

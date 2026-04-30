@@ -27,7 +27,7 @@ export function Navbar() {
     <header className="sticky top-0 z-40 bg-background/95 md:bg-background/85 backdrop-blur-xl border-b-2 border-border">
       <div className="container-app h-14 md:h-16 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2 shrink-0 group" aria-label="Tenora — accueil">
-          <TenoraLogo className="text-2xl md:text-3xl group-hover:opacity-80 transition-opacity" />
+          <TenoraLogo className="text-2xl md:text-3xl transition-colors" />
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
