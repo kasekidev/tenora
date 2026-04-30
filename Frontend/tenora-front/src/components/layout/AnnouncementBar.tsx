@@ -38,8 +38,13 @@ export function AnnouncementBar() {
   };
 
   return (
-    <div className="relative bg-primary text-primary-foreground text-[11px] sm:text-sm font-bold uppercase tracking-widest py-2 pl-4 pr-10 sm:px-4 flex items-center justify-center gap-2 border-b-2 border-foreground/10 pt-safe">
-      <Megaphone className="size-4 shrink-0" />
+    <div
+      role="region"
+      aria-label="Annonce"
+      aria-live="polite"
+      className="relative bg-primary text-primary-foreground text-[11px] sm:text-sm font-bold uppercase tracking-widest py-2 pl-4 pr-10 sm:px-4 flex items-center justify-center gap-2 border-b-2 border-foreground/10 pt-safe"
+    >
+      <Megaphone aria-hidden="true" className="size-4 shrink-0" />
       <span className="truncate text-center">{data.announcement.text}</span>
       <button
         type="button"

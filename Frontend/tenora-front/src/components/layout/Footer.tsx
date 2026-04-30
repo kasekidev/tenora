@@ -25,6 +25,7 @@ export function Footer() {
               href={`https://wa.me/${wa}`}
               target="_blank"
               rel="noopener"
+              aria-label="Contacter le support Tenora sur WhatsApp (nouvel onglet)"
               className="inline-flex items-center gap-2 mt-2 px-4 py-2.5 bg-foreground text-background text-xs font-bold uppercase tracking-widest border-2 border-foreground hover:bg-primary hover:border-primary hover:text-primary-foreground transition-colors"
             >
               <MessageCircle className="size-4" /> Support WhatsApp <ArrowUpRight className="size-4" />
@@ -66,7 +67,7 @@ export function Footer() {
             {wa && (
               <li className="flex items-center gap-2 text-muted-foreground">
                 <MessageCircle className="size-4 text-primary shrink-0" />
-                <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener" className="hover:text-primary transition-colors">
+                <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener" aria-label="Contacter Tenora sur WhatsApp (nouvel onglet)" className="hover:text-primary transition-colors">
                   WhatsApp 24/7
                 </a>
               </li>
@@ -83,7 +84,7 @@ export function Footer() {
           </p>
           <p className="flex items-center gap-2">
             Système opérationnel
-            <span className="inline-block size-1.5 bg-success rounded-full animate-pulse" />
+            <span aria-hidden="true" className="inline-block size-1.5 bg-success rounded-full animate-pulse" />
           </p>
         </div>
       </div>

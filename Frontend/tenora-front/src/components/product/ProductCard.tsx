@@ -38,7 +38,7 @@ export function ProductCard({ product }: { product: Product }) {
           />
         ) : (
           <div className="size-full flex items-center justify-center text-muted-foreground">
-            <Zap className="size-10 opacity-30" />
+            <Zap aria-hidden="true" className="size-10 opacity-30" />
           </div>
         )}
         {hasDiscount && (
@@ -56,7 +56,7 @@ export function ProductCard({ product }: { product: Product }) {
             Plus que {product.stock}
           </span>
         )}
-        <ArrowUpRight className="absolute bottom-2 right-2 size-5 text-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        <ArrowUpRight aria-hidden="true" className="absolute bottom-2 right-2 size-5 text-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
       <div className="p-3 sm:p-4">
         <h3 className="font-semibold text-sm sm:text-base line-clamp-2 min-h-[2.5em] normal-case tracking-normal">

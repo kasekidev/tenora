@@ -3,7 +3,7 @@ import { Menu, ShoppingBag, User, LogOut, Package, BookOpen, Truck } from "lucid
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { TenoraLogo } from "@/components/brand/TenoraLogo";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ export function Navbar() {
           <TenoraLogo className="text-2xl md:text-3xl transition-colors" />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden md:flex items-center gap-1" aria-label="Navigation principale">
           {links.map((l) => (
             <NavLink
               key={l.to}
@@ -82,6 +82,7 @@ export function Navbar() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[88%] max-w-sm p-0 bg-sidebar border-l-2 border-sidebar-border">
+              <SheetTitle className="sr-only">Menu de navigation</SheetTitle>
               <div className="flex items-center justify-between p-4 border-b-2 border-sidebar-border">
                 <TenoraLogo className="text-xl" />
               </div>
