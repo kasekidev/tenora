@@ -42,17 +42,17 @@ export default function Login() {
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-sm px-3 py-2">{error}</div>}
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Email</label>
+            <label htmlFor="login-email" className="text-xs font-medium text-muted-foreground">Email</label>
             <div className="relative mt-1">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+              <input id="login-email" name="email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Mot de passe</label>
+            <label htmlFor="login-password" className="text-xs font-medium text-muted-foreground">Mot de passe</label>
             <div className="relative mt-1">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+              <input id="login-password" name="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
             </div>
           </div>
           <Button type="submit" disabled={loading} size="lg" className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow">

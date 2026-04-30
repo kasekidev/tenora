@@ -16,7 +16,7 @@ export function MobileTabBar() {
     user
       ? { to: "/mes-commandes", label: "Commandes", icon: Package }
       : { to: "/connexion", label: "Connexion", icon: User },
-    { to: user ? "/profil" : "/inscription", label: user ? "Inscription" : "Inscription", icon: User },
+    { to: user ? "/profil" : "/inscription", label: user ? "Profil" : "Inscription", icon: User },
   ];
 
   return (

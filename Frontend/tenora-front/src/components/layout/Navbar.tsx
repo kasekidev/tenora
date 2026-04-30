@@ -77,7 +77,7 @@ export function Navbar() {
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden border-2">
+              <Button variant="outline" size="icon" className="md:hidden border-2" aria-label="Ouvrir le menu">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>

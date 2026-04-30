@@ -168,6 +168,28 @@
   .brut-btn-shadow:hover { transform: translate(-2px, -2px); }
   .brut-btn-shadow { transition: transform var(--transition-smooth); }
 
+  /* Touch feedback for devices without hover (mobile) */
+  @media (hover: none) and (pointer: coarse) {
+    .brut-btn-shadow:active::after { transform: translate(4px, 4px); }
+    .brut-btn-shadow:active { transform: translate(-1px, -1px); }
+  }
+
+  /* Audit fix #1 — card-elev was used in many pages but never defined */
+  .card-elev {
+    background: hsl(var(--surface-elev));
+    border: 2px solid hsl(var(--border));
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* Audit fix #4 — prevent iOS auto-zoom on focus (font-size must be >= 16px) */
+  input, textarea, select {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  /* keep additional component layer if needed */
+
   .gradient-text {
     background: var(--gradient-primary);
     -webkit-background-clip: text;

@@ -46,24 +46,24 @@ export default function Register() {
         <form onSubmit={submit} className="space-y-4">
           {error && <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-sm px-3 py-2">{typeof error === "string" ? error : "Erreur"}</div>}
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Email</label>
+            <label htmlFor="register-email" className="text-xs font-medium text-muted-foreground">Email</label>
             <div className="relative mt-1">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+              <input id="register-email" name="email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Téléphone <span className="text-muted-foreground/70">(optionnel)</span></label>
+            <label htmlFor="register-phone" className="text-xs font-medium text-muted-foreground">Téléphone <span className="text-muted-foreground/70">(optionnel)</span></label>
             <div className="relative mt-1">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+227 ..." className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+              <input id="register-phone" name="phone" type="tel" autoComplete="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+227 ..." className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Mot de passe</label>
+            <label htmlFor="register-password" className="text-xs font-medium text-muted-foreground">Mot de passe</label>
             <div className="relative mt-1">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+              <input id="register-password" name="password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">8 caractères minimum.</p>
           </div>
