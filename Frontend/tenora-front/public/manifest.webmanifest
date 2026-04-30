@@ -1,34 +1,25 @@
 {
-  "name": "Tenora — Panel administrateur",
-  "short_name": "Tenora Panel",
-  "description": "Panel administrateur de Tenora",
+  "name": "Tenora — Le digital, livré au Niger",
+  "short_name": "Tenora",
+  "description": "Recharges Free Fire, MLBB, Netflix, ebooks et import Shein. Paiement Mobile Money.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
   "lang": "fr",
-  "dir": "ltr",
-  "categories": ["business", "productivity"],
+  "categories": ["shopping", "entertainment", "lifestyle"],
+  "prefer_related_applications": false,
   "icons": [
-    {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Boutique", "short_name": "Boutique", "url": "/boutique", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Mes commandes", "short_name": "Commandes", "url": "/mes-commandes", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

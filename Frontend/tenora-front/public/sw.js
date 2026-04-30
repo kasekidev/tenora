@@ -1,29 +1,31 @@
-// public/sw.js
-// Service worker minimal pour rendre le panel installable sur Android.
-// Stratégie : network-first pour la navigation (jamais de version périmée
-// dans l'admin), cache-first pour les assets statiques (icônes, manifest).
-
-const CACHE = "tenora-panel-v1";
-const STATIC_ASSETS = [
+const CACHE = "tenora-shell-v2";
+const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png"];
+const FRESH_PWA_FILES = new Set([
   "/manifest.webmanifest",
+  "/sw.js",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
-  "/icons/icon-maskable-512.png",
   "/icons/apple-touch-icon.png",
-];
+]);
+
+const fetchFresh = async (req) => {
+  const freshReq = new Request(req, { cache: "reload" });
+  const res = await fetch(freshReq);
+  if (res && res.ok) {
+    const cache = await caches.open(CACHE);
+    await cache.put(req, res.clone());
+  }
+  return res;
+};
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(STATIC_ASSETS)).catch(() => {})
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL).catch(() => {})));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
   );
   self.clients.claim();
 });
@@ -31,15 +33,14 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-
   const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
 
-  // JAMAIS cacher l'API : l'admin doit voir des données fraîches.
-  if (url.pathname.startsWith("/panel") || url.pathname.startsWith("/api")) {
+  if (FRESH_PWA_FILES.has(url.pathname)) {
+    event.respondWith(fetchFresh(req).catch(() => caches.match(req)));
     return;
   }
 
-  // Navigation HTML : network-first, fallback cache si offline.
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req)
@@ -53,14 +54,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Assets statiques : cache-first.
-  if (STATIC_ASSETS.includes(url.pathname) || url.pathname.startsWith("/icons/")) {
+  if (/\.(?:png|jpg|jpeg|svg|webp|ico|woff2?|css|js)$/.test(url.pathname)) {
     event.respondWith(
-      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        return res;
-      }))
+      caches.match(req).then(
+        (cached) =>
+          cached ||
+          fetch(req).then((res) => {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+            return res;
+          })
+      )
     );
   }
 });
