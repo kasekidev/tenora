@@ -18,6 +18,11 @@ from app.models.import_request import ImportRequest
 from app.models.order import Order, OrderStatus
 from app.models.product import Category, Product
 from app.models.user import User
+from app.routes.order_claim import (
+    ensure_can_edit_order,
+    release_claim,
+    serialize_claim,
+)
 from app.routes.site import invalidate_site_cache
 from app.services.settings_service import (
     DEFAULT_ANNOUNCEMENT,
@@ -276,6 +281,7 @@ def list_orders(
                 "screenshot_path": o.screenshot_path,
                 "staff_note":      o.staff_note,
                 "created_at":      o.created_at.isoformat(),
+                "claim":           serialize_claim(o),
             }
             for o in orders
         ],
@@ -311,6 +317,7 @@ def get_order(
         "screenshot_path": order.screenshot_path,
         "staff_note":      order.staff_note,
         "created_at":      order.created_at.isoformat(),
+        "claim":           serialize_claim(order),
     }
 
 
@@ -338,6 +345,9 @@ def update_order_status(
     if data.status not in ORDER_STATUSES:
         raise HTTPException(status_code=400, detail=f"Statut invalide : {data.status}")
 
+    # ── HARD LOCK : refuse si la commande est claim par un autre admin ──
+    ensure_can_edit_order(order, admin, db)
+
     from app.services.mail_service import send_order_completed
 
     # client et product déjà chargés via joinedload — aucune requête supplémentaire
@@ -347,6 +357,12 @@ def update_order_status(
     old_status       = order.status
     order.status     = OrderStatus[data.status]
     order.staff_note = data.staff_note
+
+    # Auto-release du verrou si on passe en statut terminal
+    from app.routes.order_claim import TERMINAL_STATUSES
+    if data.status in TERMINAL_STATUSES:
+        release_claim(order)
+
     db.commit()
     db.refresh(order)
 
@@ -358,7 +374,11 @@ def update_order_status(
             logger.error(f"Échec envoi mail | order_id={order_id} | {e}")
 
     logger.success(f"Statut commande | order_id={order_id} | {old_status} → {data.status} | admin_id={admin.id}")
-    return {"message": "Statut mis à jour.", "status": order.status.value}
+    return {
+        "message": "Statut mis à jour.",
+        "status": order.status.value,
+        "claim": serialize_claim(order),
+    }
 
 
 @router.get("/orders/export/csv")
@@ -717,7 +737,8 @@ def list_users(
 ):
     query = db.query(User)
     if q:
-        query = query.filter(User.email.ilike(f"%{q}%"))
+        like = f"%{q}%"
+        query = query.filter((User.email.ilike(like)) | (User.username.ilike(like)))
     total = query.count()
     users = query.order_by(User.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
     return {
@@ -728,6 +749,8 @@ def list_users(
             {
                 "id":          u.id,
                 "email":       u.email,
+                "username":    u.username,
+                "phone":       u.phone,
                 "is_admin":    u.is_admin,
                 "is_verified": u.is_verified,
                 "created_at":  u.created_at.isoformat(),

@@ -20,6 +20,7 @@ from app.routes.ebooks import router as ebooks_router
 from app.routes.imports import router as imports_router
 from app.routes.orders import router as orders_router
 from app.routes.panel import router as panel_router
+from app.routes.order_claim import router as claim_router
 from app.routes.products import router as products_router
 from app.routes.site import router as site_router
 from app.services.rate_limiter import limiter
@@ -205,6 +206,7 @@ app.include_router(imports_router,  prefix="/imports",  tags=["Import/Export"])
 app.include_router(ebooks_router,   prefix="/ebooks",   tags=["Ebooks"])
 app.include_router(site_router,                         tags=["Site"])
 app.include_router(panel_router,                        tags=["Admin Panel"])
+app.include_router(claim_router,    prefix="/panel",    tags=["panel"])
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))

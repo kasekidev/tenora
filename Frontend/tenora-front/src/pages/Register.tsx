@@ -1,20 +1,25 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { UserPlus, Loader2, Mail, Lock, Phone } from "lucide-react";
+import { UserPlus, Loader2, Mail, Lock, Phone, AtSign, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { TenoraLogo } from "@/components/brand/TenoraLogo";
 import { toast } from "sonner";
+
+const USERNAME_RE = /^[a-zA-Z0-9_-]{3,20}$/;
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const usernameValid = username === "" || USERNAME_RE.test(username);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,10 +27,14 @@ export default function Register() {
       setError("Vous devez accepter les conditions d'utilisation et la politique de confidentialité.");
       return;
     }
+    if (username && !USERNAME_RE.test(username)) {
+      setError("Pseudo invalide : 3 à 20 caractères, lettres, chiffres, _ ou -.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      await register(email, password, phone || undefined);
+      await register(email, password, phone || undefined, username || undefined);
       toast.success("Compte créé ! Vérifiez votre email.");
       navigate("/verifier-email");
     } catch (err: any) {
@@ -44,7 +53,12 @@ export default function Register() {
           <p className="text-sm text-muted-foreground mt-1">Commencez à commander en 30 secondes.</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
-          {error && <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-sm px-3 py-2">{typeof error === "string" ? error : "Erreur"}</div>}
+          {error && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-sm px-3 py-2">
+              {typeof error === "string" ? error : "Erreur"}
+            </div>
+          )}
+
           <div>
             <label htmlFor="register-email" className="text-xs font-medium text-muted-foreground">Email</label>
             <div className="relative mt-1">
@@ -52,6 +66,33 @@ export default function Register() {
               <input id="register-email" name="email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
             </div>
           </div>
+
+          <div>
+            <label htmlFor="register-username" className="text-xs font-medium text-muted-foreground">
+              Pseudonyme <span className="text-muted-foreground/70">(optionnel)</span>
+            </label>
+            <div className="relative mt-1">
+              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <input
+                id="register-username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="ex: tenora_fan"
+                maxLength={20}
+                className={`w-full h-11 pl-10 pr-3 rounded-lg bg-input border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                  usernameValid ? "border-border focus:border-primary" : "border-destructive/60 focus:border-destructive"
+                }`}
+              />
+            </div>
+            <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground mt-1.5">
+              <Info className="size-3 mt-0.5 shrink-0" />
+              <span>3 à 20 caractères : lettres, chiffres, <code>_</code> ou <code>-</code>. <strong>Définitif une fois enregistré.</strong></span>
+            </p>
+          </div>
+
           <div>
             <label htmlFor="register-phone" className="text-xs font-medium text-muted-foreground">Téléphone <span className="text-muted-foreground/70">(optionnel)</span></label>
             <div className="relative mt-1">
@@ -59,6 +100,7 @@ export default function Register() {
               <input id="register-phone" name="phone" type="tel" autoComplete="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+227 ..." className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
             </div>
           </div>
+
           <div>
             <label htmlFor="register-password" className="text-xs font-medium text-muted-foreground">Mot de passe</label>
             <div className="relative mt-1">
@@ -67,6 +109,7 @@ export default function Register() {
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">8 caractères minimum.</p>
           </div>
+
           <label className="flex items-start gap-2.5 text-xs text-muted-foreground leading-relaxed cursor-pointer select-none border-2 border-border hover:border-primary/60 transition-colors p-3">
             <input
               type="checkbox"
@@ -86,7 +129,8 @@ export default function Register() {
               de Tenora.
             </span>
           </label>
-          <Button type="submit" disabled={loading || !accepted} size="lg" className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow disabled:opacity-50">
+
+          <Button type="submit" disabled={loading || !accepted || !usernameValid} size="lg" className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow disabled:opacity-50">
             {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />} Créer mon compte
           </Button>
         </form>

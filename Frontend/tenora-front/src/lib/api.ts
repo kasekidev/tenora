@@ -78,6 +78,7 @@ export interface User {
   id: number;
   email: string;
   phone: string | null;
+  username: string | null;          // ← AJOUT
   is_verified: boolean;
   is_admin: boolean;
   created_at: string;
@@ -168,15 +169,17 @@ export interface SiteInit {
 
 // ─── Endpoints ─────────────────────────────────────────────
 export const authApi = {
-  register: (data: { email: string; password: string; phone?: string }) =>
+  register: (data: { email: string; password: string; phone?: string; username?: string }) =>
     api.post<User>("/auth/register", data),
   login: (data: { email: string; password: string }) => api.post<User>("/auth/login", data),
   logout: () => api.post("/auth/logout"),
   me: () => api.get<User>("/auth/me"),
   verifyEmail: (code: string) => api.post("/auth/verify-email", null, { params: { code } }),
   resendOtp: () => api.post("/auth/resend-otp"),
-  updateProfile: (data: { phone?: string }) => api.put<User>("/auth/profile", data),
+  updateProfile: (data: { phone?: string; username?: string }) =>
+    api.put<User>("/auth/profile", data),
 };
+
 
 export const productsApi = {
   getCategoriesTree: () => api.get<CategoryTree[]>("/products/categories/tree"),

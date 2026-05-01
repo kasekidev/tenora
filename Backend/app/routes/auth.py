@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from loguru import logger
 from passlib.context import CryptContext
+from sqlalchemy import func as sql_func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -27,7 +28,6 @@ def _send_otp(user: User, db: Session) -> None:
     code      = str(random.randint(100000, 999999))
     code_hash = pwd_context.hash(code)
 
-    # Invalider les anciens OTP non utilisés
     db.query(OTPCode).filter(
         OTPCode.user_id == user.id,
         OTPCode.used    == False
@@ -45,11 +45,17 @@ def _send_otp(user: User, db: Session) -> None:
 
 
 def _purge_expired_sessions(db: Session) -> None:
-    """Supprime les sessions expirées — appelé à la connexion pour éviter l'accumulation."""
     db.query(SessionModel).filter(
         SessionModel.expires_at <= datetime.utcnow()
     ).delete(synchronize_session=False)
     db.commit()
+
+
+def _username_taken(db: Session, username: str) -> bool:
+    """Vérifie l'unicité du pseudo en case-insensitive."""
+    return db.query(User.id).filter(
+        sql_func.lower(User.username) == username.lower()
+    ).first() is not None
 
 
 # ── Register ──────────────────────────────────────────────────────────────────
@@ -64,11 +70,16 @@ def register(data: UserRegister, response: Response, request: Request, db: Sessi
         logger.warning(f"Inscription échouée | email déjà utilisé | email={data.email}")
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
+    # Si pseudo fourni, vérifier l'unicité (case-insensitive).
+    if data.username and _username_taken(db, data.username):
+        raise HTTPException(status_code=400, detail="Ce pseudo est déjà pris.")
+
     hashed = pwd_context.hash(data.password)
     user   = User(
         email         = data.email,
         password_hash = hashed,
         phone         = data.phone,
+        username      = data.username,
         is_verified   = False,
     )
     db.add(user)
@@ -78,13 +89,8 @@ def register(data: UserRegister, response: Response, request: Request, db: Sessi
     try:
         _send_otp(user, db)
     except Exception as e:
-        # L'inscription réussit même si l'email OTP échoue — le user peut renvoyer
         logger.error(f"Échec envoi OTP à l'inscription | user_id={user.id} | {e}")
 
-    # ── Auto-login après inscription ──────────────────────────────────────────
-    # Crée une session immédiatement pour que l'utilisateur arrive sur la page
-    # de vérification email déjà connecté (sinon ProtectedRoute le renvoie au
-    # login et la vérif n'arrive qu'après une connexion manuelle).
     session_duration = timedelta(days=7)
     cookie_max_age   = 7 * 24 * 60 * 60
     session_id = secrets.token_hex(32)
@@ -121,21 +127,17 @@ def login(data: UserLogin, response: Response, request: Request, db: Session = D
         logger.warning(f"Connexion échouée | email={data.email} | ip={request.client.host}")
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
 
-    # Purger les sessions expirées au moment de la connexion (pas de job dédié nécessaire)
     try:
         _purge_expired_sessions(db)
     except Exception:
-        pass  # Non bloquant
+        pass
 
-    # ── Durée de session selon le rôle ────────────────────────────────────────
-    # Admin : 12h (logout total à expiration, pas de sliding window).
-    # User  : 7j (comportement historique inchangé).
     if user.is_admin:
         session_duration = timedelta(hours=12)
-        cookie_max_age   = 12 * 60 * 60          # 43 200 s
+        cookie_max_age   = 12 * 60 * 60
     else:
         session_duration = timedelta(days=7)
-        cookie_max_age   = 7 * 24 * 60 * 60      # 604 800 s
+        cookie_max_age   = 7 * 24 * 60 * 60
 
     session_id = secrets.token_hex(32)
     session    = SessionModel(
@@ -174,13 +176,11 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
         logger.warning(f"Déconnexion sans session active | ip={request.client.host}")
 
     response.delete_cookie(
-    key      = "session_id",
-    secure   = True,
-    samesite = "none",
-    httponly = True,
+        key      = "session_id",
+        secure   = True,
+        samesite = "none",
+        httponly = True,
     )
-
-
     return {"message": "Déconnecté"}
 
 
@@ -199,7 +199,6 @@ def me(request: Request, db: Session = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=401, detail="Session expirée, veuillez vous reconnecter.")
 
-    # ✅ FIX : guard sur user None (session orpheline)
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user:
         logger.error(f"Session orpheline détectée | session_id={session_id} | user_id={session.user_id}")
@@ -277,8 +276,26 @@ def update_profile(
     db: Session = Depends(get_db),
     user: User  = Depends(get_current_user),
 ):
+    changed = False
+
     if data.phone is not None:
         user.phone = data.phone
+        changed = True
+
+    # Pseudo : autorisé UNIQUEMENT si jamais défini auparavant.
+    if data.username is not None:
+        if user.username:
+            raise HTTPException(
+                status_code=400,
+                detail="Votre pseudo est déjà défini et ne peut plus être modifié.",
+            )
+        if _username_taken(db, data.username):
+            raise HTTPException(status_code=400, detail="Ce pseudo est déjà pris.")
+        user.username = data.username
+        changed = True
+        logger.info(f"Pseudo défini | user_id={user.id} | username={data.username}")
+
+    if changed:
         db.commit()
         db.refresh(user)
         logger.info(f"Profil mis à jour | user_id={user.id}")

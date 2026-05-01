@@ -11,6 +11,10 @@ class User(Base):
     email = Column(String(255),nullable=False,unique=True)
     password_hash = Column(String(255),nullable=False)
     phone = Column(String(20),nullable=True)
+    # Pseudonyme optionnel mais IMMUABLE une fois défini.
+    # Unique en base (case-insensitive géré côté applicatif via .lower() au stockage
+    # et via un index fonctionnel côté migration). 3-20 chars, [a-zA-Z0-9_-].
+    username = Column(String(20), nullable=True, unique=True)
     is_verified = Column(Boolean, default=False)
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime,server_default=func.now())

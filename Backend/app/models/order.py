@@ -27,11 +27,33 @@ class Order(Base):
     screenshot_path  = Column(String(255), nullable=True)
     staff_note       = Column(Text, nullable=True)
     customer_info    = Column(JSON, nullable=True)
-    payment_method   = Column(String(50), nullable=True)   # ← nouveau
+    payment_method   = Column(String(50), nullable=True)
     created_at       = Column(DateTime, server_default=func.now())
     updated_at       = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    user    = relationship("User", back_populates="orders")
+    # ─── Système de claim / verrou (panel admin) ─────────────────────────────
+    claimed_by_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    claimed_at = Column(DateTime, nullable=True)
+
+    # ─── Relations ───────────────────────────────────────────────────────────
+    # IMPORTANT : deux FK pointent vers users.id (user_id ET claimed_by_id),
+    # il faut donc TOUJOURS préciser foreign_keys sur les deux relations
+    # sinon SQLAlchemy lève AmbiguousForeignKeysError au démarrage.
+    user = relationship(
+        "User",
+        back_populates="orders",
+        foreign_keys=[user_id],
+    )
+    claimed_by = relationship(
+        "User",
+        foreign_keys=[claimed_by_id],
+        lazy="joined",
+    )
     product = relationship("Product", back_populates="orders")
 
     __table_args__ = (
