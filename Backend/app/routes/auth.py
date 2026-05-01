@@ -25,7 +25,7 @@ is_dev = settings.ENVIRONMENT == "dev"
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _send_otp(user: User, db: Session) -> None:
-    code      = str(random.randint(100000, 999999))
+    code = str(secrets.randbelow(900000) + 100000)
     code_hash = pwd_context.hash(code)
 
     db.query(OTPCode).filter(

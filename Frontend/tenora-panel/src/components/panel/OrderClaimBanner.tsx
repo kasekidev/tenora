@@ -1,14 +1,12 @@
 // src/components/panel/OrderClaimBanner.tsx
 // ----------------------------------------------------------------------------
-// Bannière de verrou affichée en haut de la page de DÉTAIL d'une commande.
+// Bannière de verrou affichée en haut du dialog/détail d'une commande.
 // 3 états visuels :
 //   1. Libre        → bouton "Prendre en charge" (claim)
-//   2. Mien         → bandeau vert + bouton "Libérer" + countdown 30 min
-//   3. Pris ailleurs → bandeau rouge "Verrouillée par @pseudo" + lecture seule
+//   2. Mien         → bandeau primaire + bouton "Libérer" + countdown 30 min
+//   3. Pris ailleurs → bandeau destructive "Verrouillée par @pseudo" + lecture seule
 //
-// Le composant gère lui-même le polling (toutes les 15s) pour rester à jour
-// si un autre admin claim/libère.
-// Style cohérent avec le panel : mono, border-2, rounded-none.
+// Polling auto toutes les 15s. Layout responsive (stack mobile, row dès sm).
 // ----------------------------------------------------------------------------
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lock, LockOpen, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
@@ -24,13 +22,12 @@ import {
 
 interface Props {
   orderId: number;
-  /** État initial fourni par le parent (renvoyé par GET /panel/orders/:id). */
+  /** État initial fourni par le parent (renvoyé par GET /panel/orders/:id ou /panel/orders). */
   initialClaim?: OrderClaim | null;
-  /** Pseudo/email de l'admin courant pour détecter "is_mine" sans round-trip. */
+  /** ID de l'admin courant pour détecter "is_mine" sans round-trip. */
   currentAdminId: number;
   /**
    * Appelé chaque fois que l'état du claim change.
-   * Le parent peut s'en servir pour griser les boutons d'édition de la commande.
    * `canEdit = true` ⇔ l'admin courant peut modifier (libre OU claim à lui).
    */
   onChange?: (state: { claim: OrderClaim | null; canEdit: boolean }) => void;
@@ -54,8 +51,13 @@ export function OrderClaimBanner({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
+  // Sync si l'orderId change (réutilisation du dialog pour une autre commande).
+  useEffect(() => {
+    setClaim(initialClaim);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
+
   const isMine = claim?.claimed_by_id === currentAdminId;
-  const isLocked = !!claim?.claimed_by_id && !isMine;
   const canEdit = !claim?.claimed_by_id || isMine;
 
   // Notifie le parent à chaque changement.
@@ -127,31 +129,33 @@ export function OrderClaimBanner({
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }, [claim?.expires_at, now]);
 
+  // Container commun : stack en mobile, row dès sm.
+  const wrapper =
+    "flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 border-2";
+
   // ===== Rendu =====
   // 1) Libre
   if (!claim?.claimed_by_id) {
     return (
-      <div
-        className={cn(
-          "flex items-center gap-3 p-3 sm:p-4 border-2 border-dashed border-border bg-muted/20",
-        )}
-      >
-        <LockOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs mono uppercase tracking-wider text-muted-foreground">
-            // Commande libre
-          </p>
-          <p className="text-sm">
-            Aucun admin ne traite cette commande.
-            <span className="text-muted-foreground"> Verrouille-la pour éviter les doublons.</span>
-          </p>
+      <div className={cn(wrapper, "border-dashed border-border bg-muted/20")}>
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <LockOpen className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs mono uppercase tracking-wider text-muted-foreground">
+              // Commande libre
+            </p>
+            <p className="text-sm break-words">
+              Aucun admin ne traite cette commande.
+              <span className="text-muted-foreground"> Verrouille-la pour éviter les doublons.</span>
+            </p>
+          </div>
         </div>
         <Button
           onClick={handleClaim}
           disabled={busy || disabled}
-          className="rounded-none border-2 mono uppercase text-[11px] tracking-wider"
+          className="rounded-none border-2 mono uppercase text-[11px] tracking-wider w-full sm:w-auto h-10 sm:h-9 shrink-0"
         >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Lock className="h-3.5 w-3.5 mr-1" />}
           Prendre en charge
         </Button>
       </div>
@@ -161,29 +165,31 @@ export function OrderClaimBanner({
   // 2) C'est moi qui ai claim
   if (isMine) {
     return (
-      <div className="flex items-center gap-3 p-3 sm:p-4 border-2 border-primary bg-primary-soft/40">
-        <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs mono uppercase tracking-wider text-primary">
-            // Tu traites cette commande
-          </p>
-          <p className="text-sm">
-            Tu es le seul à pouvoir la modifier.
-            {remaining && (
-              <span className="text-muted-foreground">
-                {" "}
-                Verrou actif encore <span className="mono font-bold">{remaining}</span>.
-              </span>
-            )}
-          </p>
+      <div className={cn(wrapper, "border-primary bg-primary-soft/40")}>
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs mono uppercase tracking-wider text-primary">
+              // Tu traites cette commande
+            </p>
+            <p className="text-sm break-words">
+              Tu es le seul à pouvoir la modifier.
+              {remaining && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  Verrou actif encore <span className="mono font-bold">{remaining}</span>.
+                </span>
+              )}
+            </p>
+          </div>
         </div>
         <Button
           variant="outline"
           onClick={handleRelease}
           disabled={busy}
-          className="rounded-none border-2 mono uppercase text-[11px] tracking-wider"
+          className="rounded-none border-2 mono uppercase text-[11px] tracking-wider w-full sm:w-auto h-10 sm:h-9 shrink-0"
         >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LockOpen className="h-3.5 w-3.5" />}
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <LockOpen className="h-3.5 w-3.5 mr-1" />}
           Libérer
         </Button>
       </div>
@@ -193,15 +199,15 @@ export function OrderClaimBanner({
   // 3) Quelqu'un d'autre a claim
   const owner = claim.claimed_by_username || claim.claimed_by_email || "un autre admin";
   return (
-    <div className="flex items-center gap-3 p-3 sm:p-4 border-2 border-destructive bg-destructive/10">
-      <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+    <div className={cn(wrapper, "border-destructive bg-destructive/10 items-start sm:items-center")}>
+      <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-xs mono uppercase tracking-wider text-destructive">
           // Verrouillée
         </p>
-        <p className="text-sm">
+        <p className="text-sm break-words">
           Cette commande est traitée par{" "}
-          <span className="chip border-destructive/40 text-destructive bg-destructive/10 mono">
+          <span className="chip border-destructive/40 text-destructive bg-destructive/10 mono break-all">
             @{owner}
           </span>
           {remaining && (

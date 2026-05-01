@@ -3,7 +3,9 @@ import { persist } from "zustand/middleware";
 import api from "@/lib/api/client";
 
 interface User {
+  id: number;
   email: string;
+  username: string | null;
   is_admin: boolean;
 }
 
@@ -26,10 +28,10 @@ export const useAuthStore = create<AuthState>()(
       ready: false,
 
       login: async (email, password) => {
-        // Le backend renvoie directement le user dans la reponse de /auth/login
+        // Le backend renvoie directement le user (UserResponse) dans /auth/login
         // et pose le cookie session_id (httpOnly). On evite un second appel
         // /auth/me qui peut echouer en race condition (cookie pas encore propage).
-        const { data: me } = await api.post("/auth/login", { email, password });
+        const { data: me } = await api.post<User>("/auth/login", { email, password });
         if (!me?.is_admin) {
           await api.post("/auth/logout").catch(() => {});
           throw new Error("Acces reserve aux administrateurs.");
@@ -39,7 +41,7 @@ export const useAuthStore = create<AuthState>()(
 
       fetchMe: async () => {
         try {
-          const { data } = await api.get("/auth/me");
+          const { data } = await api.get<User>("/auth/me");
           if (!data.is_admin) {
             await get().logout();
             set({ ready: true });
