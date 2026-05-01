@@ -7,7 +7,7 @@
 # - Auto-release : libéré quand statut devient terminal (completed/rejected/refunded).
 # ============================================================================
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -25,11 +25,24 @@ CLAIM_TTL = timedelta(minutes=30)
 TERMINAL_STATUSES = {"completed", "rejected", "refunded"}
 
 
+def _utcnow() -> datetime:
+    """UTC naïf, cohérent avec le reste de la base (DateTime sans tz)."""
+    return datetime.utcnow()
+
+
+def _iso_utc(dt: datetime) -> str:
+    """ISO 8601 avec suffixe 'Z' explicite pour que JS new Date() parse en UTC."""
+    # Les datetimes stockés sont naïfs et représentent de l'UTC -> on suffixe 'Z'.
+    if dt.tzinfo is None:
+        return dt.replace(microsecond=0).isoformat() + "Z"
+    return dt.astimezone(timezone.utc).replace(microsecond=0, tzinfo=None).isoformat() + "Z"
+
+
 # === Helpers ================================================================
 def _is_claim_active(order: Order) -> bool:
     if order.claimed_by_id is None or order.claimed_at is None:
         return False
-    return datetime.utcnow() - order.claimed_at < CLAIM_TTL
+    return _utcnow() - order.claimed_at < CLAIM_TTL
 
 
 def _auto_expire(order: Order, db: Session) -> None:
@@ -57,8 +70,8 @@ def serialize_claim(order: Order) -> dict:
         "claimed_by_id": order.claimed_by_id,
         "claimed_by_username": user.username if user else None,
         "claimed_by_email": user.email if user else None,
-        "claimed_at": order.claimed_at.isoformat(),
-        "expires_at": expires_at.isoformat(),
+        "claimed_at": _iso_utc(order.claimed_at),
+        "expires_at": _iso_utc(expires_at),
     }
 
 
@@ -109,7 +122,7 @@ def claim_order(
         raise HTTPException(409, "Cette commande est terminée, aucun verrou nécessaire.")
 
     order.claimed_by_id = admin.id
-    order.claimed_at = datetime.utcnow()
+    order.claimed_at = _utcnow()
     db.commit()
     db.refresh(order)
     return {"ok": True, "claim": serialize_claim(order)}
@@ -150,3 +163,14 @@ def get_claim_status(
         raise HTTPException(404, "Commande introuvable")
     _auto_expire(order, db)
     return {"claim": serialize_claim(order), "is_mine": order.claimed_by_id == admin.id}
+
+
+# ── Compat : ancien front déployé qui faisait DELETE /panel/orders/{id}/claim
+# pour libérer. Évite les 405 dans les logs et libère proprement.
+@router.delete("/orders/{order_id}/claim")
+def delete_claim(
+    order_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+):
+    return release_order(order_id, db=db, admin=admin)

@@ -1,99 +1,26 @@
 // src/lib/api/orderClaim.ts
 // Client API pour le système de claim/verrou des commandes (panel admin).
-// Version autonome : fetch direct, aucune dépendance à un wrapper "client.ts".
-
-const API_BASE =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+import api from "./client";
 
 export interface OrderClaim {
-  admin_id: number;
-  admin_email?: string;
-  admin_username?: string;
-  claimed_at: string;
-  expires_at?: string;
+  claimed_by_id: number | null;
+  claimed_by_username: string | null;
+  claimed_by_email: string | null;
+  claimed_at: string | null;   // ISO
+  expires_at: string | null;   // ISO
 }
 
 export interface ClaimResponse {
-  success?: boolean;
-  claim?: OrderClaim | null;
-  detail?: string;
+  ok?: boolean;
+  claim: OrderClaim;
+  is_mine?: boolean;
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  try {
-    const token =
-      localStorage.getItem("token") ||
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("auth_token");
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-  } catch {
-    /* ignore */
-  }
-  return headers;
-}
+export const claimOrder = (orderId: number) =>
+  api.post<ClaimResponse>(`/panel/orders/${orderId}/claim`).then((r) => r.data);
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: "include",
-    ...init,
-    headers: {
-      ...getAuthHeaders(),
-      ...(init.headers as Record<string, string> | undefined),
-    },
-  });
+export const releaseOrder = (orderId: number) =>
+  api.post<ClaimResponse>(`/panel/orders/${orderId}/release`).then((r) => r.data);
 
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const data = await res.json();
-      if (data?.detail) detail = data.detail;
-    } catch {
-      /* pas de JSON */
-    }
-    const err = new Error(detail) as Error & { status?: number };
-    err.status = res.status;
-    throw err;
-  }
-
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
-}
-
-export async function claimOrder(
-  orderId: number | string,
-): Promise<ClaimResponse> {
-  return request<ClaimResponse>(`/panel/orders/${orderId}/claim`, {
-    method: "POST",
-  });
-}
-
-export async function releaseOrder(
-  orderId: number | string,
-): Promise<ClaimResponse> {
-  return request<ClaimResponse>(`/panel/orders/${orderId}/claim`, {
-    method: "DELETE",
-  });
-}
-
-export async function refreshClaim(
-  orderId: number | string,
-): Promise<ClaimResponse> {
-  return request<ClaimResponse>(`/panel/orders/${orderId}/claim/refresh`, {
-    method: "POST",
-  });
-}
-
-/**
- * Lit l'état actuel du verrou. Renvoie `{ claim: null }` si la commande est libre.
- * Utilisé par le polling du `OrderClaimBanner`.
- */
-export async function getClaimStatus(
-  orderId: number | string,
-): Promise<ClaimResponse> {
-  return request<ClaimResponse>(`/panel/orders/${orderId}/claim`, {
-    method: "GET",
-  });
-}
+export const getClaimStatus = (orderId: number) =>
+  api.get<ClaimResponse>(`/panel/orders/${orderId}/claim`).then((r) => r.data);

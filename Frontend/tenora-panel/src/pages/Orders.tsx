@@ -1,21 +1,30 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { Download, ChevronRight, ShoppingCart, ExternalLink, Lock, ShieldCheck } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Download, ChevronRight, ShoppingCart, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/panel/PageHeader";
 import { StatusBadge } from "@/components/panel/StatusBadge";
 import { DataCard, DataCardHeader, DataCardContent } from "@/components/panel/DataCard";
 import { SkeletonRow } from "@/components/panel/PanelSkeletons";
-import { OrderClaimBanner } from "@/components/panel/OrderClaimBanner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { getOrders, updateOrderStatus, exportOrdersCsv, type OrderListItem } from "@/lib/api/orders";
-import type { OrderClaim } from "@/lib/api/orderClaim";
-import { useAuthStore } from "@/lib/stores/auth";
+import { getOrders, updateOrderStatus, exportOrdersCsv } from "@/lib/api/orders";
 import api from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { OrderClaimBanner } from "@/components/panel/OrderClaimBanner";
+import { useAuthStore } from "@/lib/stores/auth";
+import type { OrderClaim } from "@/lib/api/orderClaim";
+
+interface Order {
+  id: number; user_email: string; product_name: string;
+  quantity: number; total_price: number; status: string;
+  payment_method: string; created_at: string;
+  notes?: string; staff_note?: string; screenshot_path?: string;
+  customer_info?: { delivery_name?: string; delivery_phone?: string; delivery_address?: string; };
+  claim?: OrderClaim | null;
+}
 
 const statusOptions = [
   { label: "Toutes", value: "all" },
@@ -26,7 +35,6 @@ const statusOptions = [
   { label: "Remboursées", value: "refunded" },
 ];
 const editStatuses = statusOptions.slice(1);
-const TERMINAL_STATUSES = new Set(["completed", "rejected", "refunded"]);
 
 const screenshotUrl = (path?: string) => {
   if (!path) return "";
@@ -36,9 +44,7 @@ const screenshotUrl = (path?: string) => {
 };
 
 export default function Orders() {
-  const currentAdminId = useAuthStore((s) => s.user?.id);
-
-  const [orders, setOrders] = useState<OrderListItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -46,22 +52,19 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [show, setShow] = useState(false);
-  const [selected, setSelected] = useState<OrderListItem | null>(null);
+  const [selected, setSelected] = useState<Order | null>(null);
   const [editStatus, setEditStatus] = useState("");
   const [staffNote, setStaffNote] = useState("");
   const [updating, setUpdating] = useState(false);
-
-  // État du claim de la commande ouverte (poussé par OrderClaimBanner via onChange).
-  const [activeClaim, setActiveClaim] = useState<OrderClaim | null>(null);
   const [canEdit, setCanEdit] = useState(true);
+  const adminId = useAuthStore((s) => s.user?.id) ?? -1;
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await getOrders({
         status: statusFilter !== "all" ? statusFilter : undefined,
-        page,
-        per_page: pageSize,
+        page, per_page: pageSize,
       });
       setOrders(data.orders || []);
       setTotal(data.total || 0);
@@ -72,40 +75,33 @@ export default function Orders() {
     }
   }, [statusFilter, page]);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   const fmt = (n: number) => `${n?.toLocaleString("fr-FR")} F`;
 
-  const open = (o: OrderListItem) => {
-    setSelected(o);
-    setEditStatus(o.status);
-    setStaffNote(o.staff_note || "");
-    setActiveClaim(o.claim ?? null);
-    // Optimistic: si claim libre ou à moi → editable, sinon non.
-    const mine = !!o.claim?.claimed_by_id && o.claim.claimed_by_id === currentAdminId;
-    setCanEdit(!o.claim?.claimed_by_id || mine);
+  const open = (o: Order) => {
+    setSelected(o); setEditStatus(o.status); setStaffNote(o.staff_note || "");
+    // Par défaut on autorise l'édition ; le banner ré-évalue selon le claim.
+    setCanEdit(true);
     setShow(true);
   };
 
   const updateStatus = async () => {
     if (!selected) return;
+    if (!canEdit) {
+      toast.error("Commande verrouillée par un autre admin");
+      return;
+    }
     setUpdating(true);
     try {
       await updateOrderStatus(selected.id, { status: editStatus, staff_note: staffNote });
       toast.success("Statut mis à jour");
       setShow(false);
       fetchOrders();
-    } catch (e: any) {
-      const status = e?.response?.status;
-      if (status === 423) {
-        toast.error("Commande verrouillée par un autre admin");
-      } else {
-        toast.error("Erreur");
-      }
+    } catch {
+      toast.error("Erreur");
     } finally {
       setUpdating(false);
     }
@@ -116,29 +112,18 @@ export default function Orders() {
       const { data } = await exportOrdersCsv(statusFilter !== "all" ? statusFilter : undefined);
       const url = URL.createObjectURL(new Blob([data]));
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `commandes_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      a.href = url; a.download = `commandes_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click(); URL.revokeObjectURL(url);
       toast.success("CSV exporté");
     } catch {
       toast.error("Erreur export");
     }
   };
 
-  const isTerminal = useMemo(
-    () => (selected ? TERMINAL_STATUSES.has(selected.status) : false),
-    [selected]
-  );
-
   return (
     <div className="space-y-6 animate-fade-up">
       <PageHeader eyebrow="Gestion" title="Commandes" subtitle={`// ${total} entrée(s)`}>
-        <Button
-          variant="outline"
-          onClick={handleExport}
-          className="h-9 rounded-none border-2 mono uppercase tracking-wider text-xs"
-        >
+        <Button variant="outline" onClick={handleExport} className="h-9 rounded-none border-2 mono uppercase tracking-wider text-xs">
           <Download className="h-3.5 w-3.5 mr-2" /> Export CSV
         </Button>
       </PageHeader>
@@ -185,57 +170,32 @@ export default function Orders() {
             </div>
           ) : (
             <div className="divide-y-2 divide-border">
-              {orders.map((o) => {
-                const claimedById = o.claim?.claimed_by_id ?? null;
-                const isMine = claimedById !== null && claimedById === currentAdminId;
-                const isLockedByOther = claimedById !== null && !isMine;
-                return (
-                  <div
-                    key={o.id}
-                    onClick={() => open(o)}
-                    className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 p-3 sm:p-4 cursor-pointer hover:bg-muted/30 transition-colors active:bg-muted/40"
-                  >
-                    <span className="mono text-[10px] text-muted-foreground w-10 sm:w-12 shrink-0">#{o.id}</span>
-                    <div className="h-9 w-9 border-2 border-primary/40 bg-primary-soft flex items-center justify-center mono text-xs font-bold text-primary shrink-0">
-                      {o.user_email?.[0]?.toUpperCase() || "?"}
-                    </div>
-                    <div className="flex-1 min-w-0 basis-[55%] sm:basis-auto">
-                      <p className="text-sm font-semibold truncate">{o.product_name || "--"}</p>
-                      <p className="text-[10px] mono text-muted-foreground truncate">{o.user_email}</p>
-                      <p className="text-[10px] mono text-muted-foreground sm:hidden mt-0.5">{fmtDate(o.created_at)}</p>
-                    </div>
-
-                    <div className="hidden md:block mono text-[10px] text-muted-foreground shrink-0">{fmtDate(o.created_at)}</div>
-
-                    <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0 flex-wrap justify-end">
-                      {isMine && (
-                        <span
-                          title="Tu traites cette commande"
-                          className="chip border-primary/50 text-primary bg-primary-soft inline-flex items-center gap-1"
-                        >
-                          <ShieldCheck className="h-3 w-3" />
-                          MOI
-                        </span>
-                      )}
-                      {isLockedByOther && (
-                        <span
-                          title={`Verrouillée par ${o.claim?.claimed_by_username || o.claim?.claimed_by_email || "un admin"}`}
-                          className="chip border-destructive/40 text-destructive bg-destructive/10 inline-flex items-center gap-1 max-w-[10rem] truncate"
-                        >
-                          <Lock className="h-3 w-3 shrink-0" />
-                          <span className="truncate">
-                            @{o.claim?.claimed_by_username || o.claim?.claimed_by_email || "admin"}
-                          </span>
-                        </span>
-                      )}
-                      <div className="mono text-sm font-bold whitespace-nowrap">{fmt(o.total_price)}</div>
-                      <StatusBadge status={o.status} />
-                      <span className="hidden lg:inline-block chip border-border">{o.payment_method}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
+              {orders.map((o) => (
+                <div
+                  key={o.id}
+                  onClick={() => open(o)}
+                  className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 p-3 sm:p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                >
+                  <span className="mono text-[10px] text-muted-foreground w-10 sm:w-12 shrink-0">#{o.id}</span>
+                  <div className="h-9 w-9 border-2 border-primary/40 bg-primary-soft flex items-center justify-center mono text-xs font-bold text-primary shrink-0">
+                    {o.user_email?.[0]?.toUpperCase() || "?"}
                   </div>
-                );
-              })}
+                  <div className="flex-1 min-w-0 basis-[55%] sm:basis-auto">
+                    <p className="text-sm font-semibold truncate">{o.product_name || "--"}</p>
+                    <p className="text-[10px] mono text-muted-foreground truncate">{o.user_email}</p>
+                    <p className="text-[10px] mono text-muted-foreground sm:hidden mt-0.5">{fmtDate(o.created_at)}</p>
+                  </div>
+
+                  <div className="hidden md:block mono text-[10px] text-muted-foreground shrink-0">{fmtDate(o.created_at)}</div>
+
+                  <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0 flex-wrap justify-end">
+                    <div className="mono text-sm font-bold whitespace-nowrap">{fmt(o.total_price)}</div>
+                    <StatusBadge status={o.status} />
+                    <span className="hidden lg:inline-block chip border-border">{o.payment_method}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -254,7 +214,7 @@ export default function Orders() {
       </DataCard>
 
       <Dialog open={show} onOpenChange={setShow}>
-        <DialogContent className="rounded-none border-2 max-w-xl max-h-[92vh] overflow-y-auto w-[calc(100vw-1rem)] sm:w-full p-4 sm:p-6">
+        <DialogContent className="rounded-none border-2 max-w-xl max-h-[92vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full">
           <DialogHeader>
             <DialogTitle className="mono uppercase tracking-wider text-sm">
               // Commande #{selected?.id}
@@ -262,51 +222,30 @@ export default function Orders() {
           </DialogHeader>
           {selected && (
             <div className="space-y-5">
-              {/* === BANNIÈRE DE VERROU === */}
-              {currentAdminId !== undefined && (
-                <OrderClaimBanner
-                  orderId={selected.id}
-                  initialClaim={activeClaim}
-                  currentAdminId={currentAdminId}
-                  disabled={isTerminal}
-                  onChange={({ claim, canEdit }) => {
-                    setActiveClaim(claim);
-                    setCanEdit(canEdit);
-                  }}
-                />
-              )}
-
+              <OrderClaimBanner
+                key={selected.id}
+                orderId={selected.id}
+                initialClaim={selected.claim ?? null}
+                currentAdminId={adminId}
+                onChange={({ canEdit }) => setCanEdit(canEdit)}
+                disabled={["completed", "rejected", "refunded"].includes(selected.status)}
+              />
               <div className="brackets brut-card p-4 space-y-3">
                 <p className="eyebrow">// Statut</p>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <Select value={editStatus} onValueChange={setEditStatus} disabled={!canEdit || isTerminal}>
+                  <Select value={editStatus} onValueChange={setEditStatus} disabled={!canEdit}>
                     <SelectTrigger className="rounded-none border-2 mono"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-none border-2">
                       {editStatuses.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Button
-                    onClick={updateStatus}
-                    disabled={updating || !canEdit || isTerminal}
-                    className="rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider text-xs"
-                  >
+                  <Button onClick={updateStatus} disabled={updating || !canEdit} className="rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider text-xs">
                     {updating ? "..." : "OK"}
                   </Button>
                 </div>
-                {!canEdit && !isTerminal && (
-                  <p className="text-[11px] mono text-destructive">
-                    // Lecture seule — verrouillée par un autre admin.
-                  </p>
-                )}
                 <div>
                   <Label className="eyebrow mb-1.5 block" style={{ color: "hsl(var(--muted-foreground))" }}>Note interne</Label>
-                  <Textarea
-                    rows={2}
-                    value={staffNote}
-                    onChange={(e) => setStaffNote(e.target.value)}
-                    disabled={!canEdit || isTerminal}
-                    className="rounded-none border-2 mono text-sm"
-                  />
+                  <Textarea rows={2} value={staffNote} onChange={(e) => setStaffNote(e.target.value)} disabled={!canEdit} className="rounded-none border-2 mono text-sm" />
                 </div>
               </div>
 
@@ -338,12 +277,7 @@ export default function Orders() {
               {selected.screenshot_path && (
                 <div className="brackets brut-card p-4">
                   <p className="eyebrow mb-2">// Capture paiement</p>
-                  <a
-                    href={screenshotUrl(selected.screenshot_path)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 chip border-tertiary/40 text-tertiary hover:bg-tertiary hover:text-tertiary-foreground transition-colors"
-                  >
+                  <a href={screenshotUrl(selected.screenshot_path)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 chip border-tertiary/40 text-tertiary hover:bg-tertiary hover:text-tertiary-foreground transition-colors">
                     Ouvrir <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
