@@ -2,6 +2,18 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+// Applique le thème sauvegardé avant le premier rendu (évite le flash).
+// Le thème sombre est le thème par défaut — aucune classe = sombre.
+try {
+  const saved = localStorage.getItem("tenora-theme");
+  if (saved === "light") {
+    document.documentElement.classList.add("light");
+  } else if (!saved) {
+    // Première visite : on ancre explicitement le sombre
+    localStorage.setItem("tenora-theme", "dark");
+  }
+} catch {}
+
 createRoot(document.getElementById("root")!).render(<App />);
 
 if ("serviceWorker" in navigator) {

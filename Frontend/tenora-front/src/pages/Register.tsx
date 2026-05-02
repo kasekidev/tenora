@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { UserPlus, Loader2, Mail, Lock, Phone, AtSign, Info } from "lucide-react";
+import { UserPlus, Loader2, Mail, Lock, Phone, AtSign, Info, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { TenoraLogo } from "@/components/brand/TenoraLogo";
@@ -15,6 +15,7 @@ export default function Register() {
   const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,7 +47,7 @@ export default function Register() {
 
   return (
     <div className="container-app py-10 md:py-16 flex items-center justify-center min-h-[70vh]">
-      <div className="w-full max-w-md card-elev rounded-2xl p-6 md:p-8">
+      <div className="w-full max-w-md card-elev p-6 md:p-8">
         <div className="flex flex-col items-center text-center mb-6">
           <TenoraLogo className="size-12 mb-3" />
           <h1 className="font-display text-2xl font-bold">Créer un compte</h1>
@@ -54,7 +55,7 @@ export default function Register() {
         </div>
         <form onSubmit={submit} className="space-y-4">
           {error && (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive text-sm px-3 py-2">
+            <div className="border border-destructive/40 bg-destructive/10 text-destructive text-sm px-3 py-2">
               {typeof error === "string" ? error : "Erreur"}
             </div>
           )}
@@ -63,7 +64,17 @@ export default function Register() {
             <label htmlFor="register-email" className="text-xs font-medium text-muted-foreground">Email</label>
             <div className="relative mt-1">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input id="register-email" name="email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+              <input
+                id="register-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full h-11 pl-10 pr-3 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              />
             </div>
           </div>
 
@@ -82,7 +93,7 @@ export default function Register() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="ex: tenora_fan"
                 maxLength={20}
-                className={`w-full h-11 pl-10 pr-3 rounded-lg bg-input border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                className={`w-full h-11 pl-10 pr-3 bg-input border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 ${
                   usernameValid ? "border-border focus:border-primary" : "border-destructive/60 focus:border-destructive"
                 }`}
               />
@@ -94,10 +105,22 @@ export default function Register() {
           </div>
 
           <div>
-            <label htmlFor="register-phone" className="text-xs font-medium text-muted-foreground">Téléphone <span className="text-muted-foreground/70">(optionnel)</span></label>
+            <label htmlFor="register-phone" className="text-xs font-medium text-muted-foreground">
+              Téléphone <span className="text-muted-foreground/70">(optionnel)</span>
+            </label>
             <div className="relative mt-1">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input id="register-phone" name="phone" type="tel" autoComplete="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+227 ..." className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+              <input
+                id="register-phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+227 ..."
+                className="w-full h-11 pl-10 pr-3 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              />
             </div>
           </div>
 
@@ -105,7 +128,26 @@ export default function Register() {
             <label htmlFor="register-password" className="text-xs font-medium text-muted-foreground">Mot de passe</label>
             <div className="relative mt-1">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <input id="register-password" name="password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-11 pl-10 pr-3 rounded-lg bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary" />
+              <input
+                id="register-password"
+                name="password"
+                type={showPwd ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full h-11 pl-10 pr-11 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd((v) => !v)}
+                aria-label={showPwd ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                tabIndex={-1}
+              >
+                {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">8 caractères minimum.</p>
           </div>
@@ -130,7 +172,12 @@ export default function Register() {
             </span>
           </label>
 
-          <Button type="submit" disabled={loading || !accepted || !usernameValid} size="lg" className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow disabled:opacity-50">
+          <Button
+            type="submit"
+            disabled={loading || !accepted || !usernameValid}
+            size="lg"
+            className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow disabled:opacity-50"
+          >
             {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />} Créer mon compte
           </Button>
         </form>

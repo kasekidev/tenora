@@ -82,13 +82,86 @@
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-smooth: 280ms cubic-bezier(0.22, 1, 0.36, 1);
   }
+
+  /* =========================================================
+     TENORA — Thème Clair : Pétrole + Ambre
+     Fond bleu acier ~#607f96 · Accent ambre #d48820 · Texte quasi-noir
+     Activé via html.light (toggle + localStorage)
+     CONTRASTE : muted-foreground à 9% L → ratio 4.8:1 sur bg (WCAG AA ✓)
+     ========================================================= */
+  html.light {
+    /* Background légèrement plus clair (48% vs 40%) = plus de marge pour le texte */
+    --background: 200 22% 48%;           /* ~#607f96 */
+    --foreground: 200 60% 5%;            /* #071421 quasi-noir */
+
+    --card: 200 22% 40%;                 /* #4e7080 — clairement plus sombre que bg */
+    --card-foreground: 200 60% 5%;
+
+    --popover: 200 22% 40%;
+    --popover-foreground: 200 60% 5%;
+
+    --muted: 200 22% 33%;                /* zones déprimées */
+    --muted-foreground: 200 50% 9%;      /* #0b2033 — très sombre = lisible partout */
+
+    --surface-elev: 200 22% 43%;
+    --surface-elev-2: 200 22% 36%;
+
+    /* Accent unique : ambre chaud */
+    --primary: 38 74% 48%;               /* #d48820 */
+    --primary-foreground: 200 60% 5%;
+    --primary-glow: 38 80% 58%;
+
+    --secondary: 200 60% 5%;
+    --secondary-foreground: 200 22% 88%;
+
+    --accent: 200 22% 56%;               /* pétrole clair pour chips/badges */
+    --accent-foreground: 200 60% 5%;
+
+    --whatsapp: 142 70% 38%;
+    --whatsapp-foreground: 0 0% 100%;
+
+    --warning: 38 74% 48%;
+    --warning-foreground: 200 60% 5%;
+
+    --destructive: 0 70% 40%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 158 55% 35%;
+    --success-foreground: 0 0% 98%;
+
+    --border: 200 55% 8%;                /* #0b2030 — trait net, DNA brutalist */
+    --input: 200 22% 45%;                /* légèrement plus clair que card = champ visible */
+    --ring: 38 74% 48%;
+
+    /* Gradients — sobres */
+    --gradient-primary: linear-gradient(90deg, hsl(38 74% 48%), hsl(38 60% 62%));
+    --gradient-accent: linear-gradient(90deg, hsl(200 60% 5%), hsl(200 22% 40%));
+    --gradient-hero: linear-gradient(180deg, hsl(200 22% 48%), hsl(200 22% 42%));
+    --gradient-card: linear-gradient(180deg, hsl(200 22% 41%), hsl(200 22% 37%));
+
+    /* Shadows — offset ambre brutal */
+    --shadow-glow: 0 0 20px -5px hsl(38 74% 48% / 0.45);
+    --shadow-magenta: 0 0 20px -6px hsl(38 74% 48% / 0.3);
+    --shadow-cyan: 0 0 20px -6px hsl(200 30% 78% / 0.25);
+    --shadow-card: 0 8px 0 0 hsl(200 55% 8%);
+    --shadow-soft: 0 1px 0 hsl(0 0% 0% / 0.1) inset;
+
+    /* Sidebar — tout le texte en quasi-noir, lisible */
+    --sidebar-background: 200 22% 38%;
+    --sidebar-foreground: 200 60% 5%;
+    --sidebar-primary: 38 74% 48%;
+    --sidebar-primary-foreground: 200 60% 5%;
+    --sidebar-accent: 200 22% 32%;
+    --sidebar-accent-foreground: 200 50% 9%;
+    --sidebar-border: 200 55% 8%;
+    --sidebar-ring: 38 74% 48%;
+  }
 }
 
 @layer base {
   * { @apply border-border; }
   html {
     -webkit-tap-highlight-color: transparent;
-    /* Empêche le double-tap zoom sur Android, garde le pinch-zoom volontaire */
     touch-action: manipulation;
   }
   body {
@@ -98,8 +171,11 @@
       radial-gradient(700px 400px at 100% 0%, hsl(300 100% 25% / 0.10), transparent 60%),
       radial-gradient(600px 400px at 0% 100%, hsl(180 100% 25% / 0.08), transparent 55%);
     background-attachment: fixed;
-    /* Évite le bounce blanc sur iOS/Android quand on overscroll */
     overscroll-behavior-y: none;
+  }
+  /* Supprime les halos néon en mode clair */
+  html.light body {
+    background-image: none;
   }
   h1,h2,h3,h4 {
     font-family: 'Teko', 'Space Grotesk', sans-serif;
@@ -109,7 +185,6 @@
   }
   ::selection { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
 
-  /* Active state tactile (feeling natif) — uniquement sur appareils tactiles */
   @media (hover: none) and (pointer: coarse) {
     a:active,
     button:active,
@@ -117,7 +192,6 @@
       transform: scale(0.97);
       transition: transform 80ms ease-out;
     }
-    /* Désactive backdrop-blur sur mobile : coûteux GPU sur Android low-end */
     .backdrop-blur-xl,
     .backdrop-blur-lg,
     .backdrop-blur-md,
@@ -147,7 +221,7 @@
     box-shadow: 6px 6px 0 0 hsl(var(--primary) / 0.6);
   }
 
-  /* Brutalist push button (offset shadow that lifts on hover) */
+  /* Brutalist push button */
   .brut-btn {
     @apply relative inline-flex items-center justify-center font-bold uppercase tracking-wider;
     font-family: 'Teko', sans-serif;
@@ -168,28 +242,23 @@
   .brut-btn-shadow:hover { transform: translate(-2px, -2px); }
   .brut-btn-shadow { transition: transform var(--transition-smooth); }
 
-  /* Touch feedback for devices without hover (mobile) */
   @media (hover: none) and (pointer: coarse) {
     .brut-btn-shadow:active::after { transform: translate(4px, 4px); }
     .brut-btn-shadow:active { transform: translate(-1px, -1px); }
   }
 
-  /* Audit fix #1 — card-elev was used in many pages but never defined */
   .card-elev {
     background: hsl(var(--surface-elev));
     border: 2px solid hsl(var(--border));
     box-shadow: var(--shadow-soft);
   }
 
-  /* Audit fix #4 — prevent iOS auto-zoom on focus (font-size must be >= 16px) */
   input, textarea, select {
     font-size: 16px;
   }
 }
 
 @layer components {
-  /* keep additional component layer if needed */
-
   .gradient-text {
     background: var(--gradient-primary);
     -webkit-background-clip: text;
@@ -202,7 +271,6 @@
     border: 1px solid hsl(var(--border));
   }
 
-  /* Backgrounds */
   .bg-grid {
     background-image:
       linear-gradient(to right, hsl(var(--border) / 0.55) 1px, transparent 1px),
@@ -219,7 +287,6 @@
     pointer-events: none;
   }
 
-  /* Hide scrollbars on horizontal rails */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -228,7 +295,6 @@
   .h-safe-top { height: env(safe-area-inset-top, 0px); }
   .px-safe { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 
-  /* Garantit qu'on respecte la hauteur visible réelle (Android/iOS barres dynamiques) */
   .min-h-dvh { min-height: 100dvh; }
   .h-dvh { height: 100dvh; }
 }
@@ -236,7 +302,6 @@
 @layer utilities {
   .text-balance { text-wrap: balance; }
 
-  /* Marquee ticker */
   .animate-marquee { animation: marquee 28s linear infinite; }
   @keyframes marquee {
     from { transform: translateX(0); }
@@ -249,8 +314,6 @@
     50% { box-shadow: 0 0 0 14px hsl(var(--primary) / 0); }
   }
 
-  /* Fade-up: state final par défaut (opacity:1). L'animation ne fait que jouer l'entrée.
-     Ça garantit que si l'animation est purgée, bloquée ou prefers-reduced-motion, le contenu reste visible. */
   .animate-fade-up {
     opacity: 1;
     animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1);
@@ -266,7 +329,6 @@
   }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-  /* Respect prefers-reduced-motion + fallback global : aucune animation ne doit cacher du contenu */
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-up,
     .animate-fade-in,

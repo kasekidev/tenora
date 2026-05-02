@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, ShoppingBag, Package, User, BookOpen } from "lucide-react";
+import { Home, ShoppingBag, Package, User, BookOpen, LogIn, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
@@ -15,8 +15,8 @@ export function MobileTabBar() {
     ...tabs,
     user
       ? { to: "/mes-commandes", label: "Commandes", icon: Package }
-      : { to: "/connexion", label: "Connexion", icon: User },
-    { to: user ? "/profil" : "/inscription", label: user ? "Profil" : "Inscription", icon: User },
+      : { to: "/connexion", label: "Connexion", icon: LogIn },
+    { to: user ? "/profil" : "/inscription", label: user ? "Profil" : "S'inscrire", icon: user ? User : UserPlus },
   ];
 
   return (
@@ -33,7 +33,6 @@ export function MobileTabBar() {
             end={(t as { end?: boolean }).end}
             className={({ isActive }) =>
               cn(
-                // min-h 56px = recommandation Android Material pour tap targets
                 "relative flex flex-col items-center justify-center gap-1 min-h-[56px] py-2 px-0.5 text-[9px] font-bold uppercase tracking-wider transition-colors",
                 "active:bg-muted/40",
                 isActive ? "text-primary" : "text-muted-foreground"

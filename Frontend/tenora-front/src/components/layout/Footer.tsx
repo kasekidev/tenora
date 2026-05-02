@@ -8,7 +8,7 @@ export function Footer() {
   const wa = data?.whatsapp_number?.replace(/\D/g, "") || "";
 
   return (
-    <footer className="mt-16 border-t-2 border-border bg-card relative overflow-hidden">
+    <footer className="mt-16 border-t-2 border-border bg-card relative overflow-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
       <div className="absolute inset-0 bg-grid opacity-[0.04] pointer-events-none" aria-hidden />
 
       {/* Bloc principal */}
