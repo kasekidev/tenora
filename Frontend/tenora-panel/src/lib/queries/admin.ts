@@ -13,6 +13,11 @@
  *
  * Convention `qk` : tous les keys passent par cette factory typée pour éviter
  * les fautes de frappe et faciliter l'invalidation ciblée.
+ *
+ * OPTIMISATIONS (audit requêtes) :
+ *  - staleTime augmenté sur les données quasi-statiques (Users 5min, Imports 60s)
+ *  - refetchOnWindowFocus désactivé pour Settings, Users, Categories (données stables)
+ *  - refetchOnWindowFocus maintenu pour Orders, Dashboard, Imports (fraîcheur critique)
  */
 import {
   useQuery,
@@ -52,7 +57,7 @@ export function useDashboard() {
   return useQuery({
     queryKey: qk.dashboard,
     queryFn: async () => (await getDashboard()).data,
-    staleTime: 60_000,                 // dashboard : ok stale 1 min
+    staleTime: 60_000,
   });
 }
 
@@ -61,7 +66,8 @@ export function useCategories() {
   return useQuery({
     queryKey: qk.categories,
     queryFn: async () => (await getCategories()).data ?? [],
-    staleTime: 5 * 60_000,             // peu de changements → cache long
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,       // données stables, l'admin sait quand rafraîchir
   });
 }
 
@@ -69,7 +75,6 @@ export function useCategoryMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: qk.categories });
-    // Les produits affichent category_name → invalider aussi
     qc.invalidateQueries({ queryKey: ["products"] });
   };
   return {
@@ -112,11 +117,10 @@ export function useProducts(params: ProductsListParams = {}) {
     queryKey: qk.products(params),
     queryFn: async () => {
       const { data } = await getProducts(params);
-      // Compat ancien format (tableau brut) ↔ nouveau format paginé
       if (Array.isArray(data)) return { products: data, total: data.length, page: 1, per_page: data.length };
       return data as { products: unknown[]; total: number; page: number; per_page: number };
     },
-    placeholderData: keepPreviousData,   // pas de flicker entre pages
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 }
@@ -126,7 +130,7 @@ export function useProductMutations() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: qk.dashboard });
-    qc.invalidateQueries({ queryKey: qk.categories }); // product_count change
+    qc.invalidateQueries({ queryKey: qk.categories });
   };
   return {
     create: useMutation({
@@ -158,7 +162,7 @@ export function useOrders(params: { status?: string; page: number; per_page: num
       orders: unknown[]; total: number; page: number; per_page: number;
     },
     placeholderData: keepPreviousData,
-    staleTime: 15_000,                 // commandes : fraîcheur plus serrée
+    staleTime: 15_000,
   });
 }
 
@@ -182,11 +186,10 @@ export function useImports(status?: string) {
     queryKey: qk.imports(status),
     queryFn: async () => {
       const { data } = await getImports(status);
-      // Compat liste brute / format paginé
       if (Array.isArray(data)) return { items: data, total: data.length };
       return data as { items: unknown[]; total: number };
     },
-    staleTime: 30_000,
+    staleTime: 60_000,                 // 30s → 60s : imports changent moins souvent
   });
 }
 
@@ -209,7 +212,8 @@ export function useUsers(params: { page: number; per_page: number; q?: string })
       users: unknown[]; total: number; page: number; per_page: number;
     },
     placeholderData: keepPreviousData,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,            // 60s → 5min : les users ne s'ajoutent pas en boucle
+    refetchOnWindowFocus: false,       // données stables
   });
 }
 
@@ -219,5 +223,6 @@ export function useSettings() {
     queryKey: qk.settings,
     queryFn: async () => (await getSettings()).data,
     staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,       // settings : l'admin sait quand il modifie
   });
 }

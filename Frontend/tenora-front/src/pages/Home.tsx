@@ -27,9 +27,9 @@ const services = [
     icon: Gamepad2,
     code: "01",
     tag: "Gaming",
-    title: "Free Fire & MLBB",
+    title: "Free Fire, MLBB & Bien d'autres",
     desc: "Drop de diamants sur ID en moins de 60s. Pas besoin de login.",
-    price: "Dès 500 F",
+    price: "Dès 1 500",
     to: "/boutique",
     accent: "magenta",
     big: true,
@@ -39,7 +39,7 @@ const services = [
     code: "02",
     tag: "Streaming",
     title: "Netflix 4K",
-    desc: "Activation 5 min, écrans privés.",
+    desc: "Activation  rapide, satisfaction garantie.",
     price: "3 500 F",
     to: "/boutique",
     accent: "primary",
@@ -49,7 +49,7 @@ const services = [
     code: "03",
     tag: "Import",
     title: "Shein / Alibaba",
-    desc: "Sans carte. Livré à Niamey.",
+    desc: "Sans carte. Livré à Niamey Et Partout Au Niger.",
     price: "Devis gratuit",
     to: "/import",
     accent: "cyan",
@@ -60,7 +60,7 @@ const services = [
     tag: "Knowledge",
     title: "Ebooks & Formations",
     desc: "Business, marketing, dev.",
-    price: "Dès 1 000 F",
+    price: "Dès 1 250 F",
     to: "/ebooks",
     accent: "primary",
   },
@@ -75,14 +75,14 @@ const accentMap: Record<string, { border: string; text: string; bg: string; shad
 const steps = [
   { n: "01", icon: ShoppingBag, title: "Choisir", desc: "Parcourez la boutique. Ajoutez votre commande au panier." },
   { n: "02", icon: CreditCard, title: "Payer", desc: "Mobile Money — Airtel ou Moov. Confirmation immédiate." },
-  { n: "03", icon: Zap, title: "Recevoir", desc: "Activation digitale en minutes. Import sous 24h à Niamey." },
+  { n: "03", icon: Zap, title: "Recevoir", desc: "Activation digitale en minutes. Import sous 24h à Niamey Et Partout Au Niger." },
 ];
 
 const tickerItems = [
   "Livraison < 2 min",
-  "Paiement Airtel & Moov",
+  "Paiement Mynita,Amanata,Mobile Money & crypto",
   "Support WhatsApp 24/7",
-  "+500 clients à Niamey",
+  "+500 clients satisfaits",
   "Note 4.9 / 5",
   "Activation instantanée",
 ];
@@ -94,10 +94,10 @@ const testimonials = [
 ];
 
 const whyUs = [
-  { icon: ShieldCheck, title: "100% sécurisé", desc: "Mobile Money ou cash sur place." },
+  { icon: ShieldCheck, title: "100% sécurisé", desc: "Mobile Money,Mynita,Amanata & Crypto." },
   { icon: Headphones, title: "Support humain", desc: "Réponse WhatsApp sous 5 min." },
   { icon: MapPin, title: "Basés à Niamey", desc: "Service local, prix locaux." },
-  { icon: Zap, title: "Livraison express", desc: "Digital en minutes, import < 24h." },
+  { icon: Zap, title: "Livraison express", desc: "Digital en minutes, imports dans la semaine." },
 ];
 
 export default function Home() {

@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Download, ChevronRight, ShoppingCart, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/panel/PageHeader";
 import { StatusBadge } from "@/components/panel/StatusBadge";
@@ -9,12 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { getOrders, updateOrderStatus, exportOrdersCsv } from "@/lib/api/orders";
+import { exportOrdersCsv } from "@/lib/api/orders";
 import api from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { OrderClaimBanner } from "@/components/panel/OrderClaimBanner";
 import { useAuthStore } from "@/lib/stores/auth";
+import { useOrders, useOrderMutations, qk } from "@/lib/queries/admin";
 import type { OrderClaim } from "@/lib/api/orderClaim";
 
 interface Order {
@@ -44,38 +46,27 @@ const screenshotUrl = (path?: string) => {
 };
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const { data: ordersData, isLoading: loading } = useOrders({
+    status: statusFilter !== "all" ? statusFilter : undefined,
+    page,
+    per_page: pageSize,
+  });
+  const orders = (ordersData?.orders ?? []) as Order[];
+  const total  = ordersData?.total ?? 0;
+
+  const { updateStatus: updateStatusMutation } = useOrderMutations();
 
   const [show, setShow] = useState(false);
   const [selected, setSelected] = useState<Order | null>(null);
   const [editStatus, setEditStatus] = useState("");
   const [staffNote, setStaffNote] = useState("");
-  const [updating, setUpdating] = useState(false);
   const [canEdit, setCanEdit] = useState(true);
   const adminId = useAuthStore((s) => s.user?.id) ?? -1;
-
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await getOrders({
-        status: statusFilter !== "all" ? statusFilter : undefined,
-        page, per_page: pageSize,
-      });
-      setOrders(data.orders || []);
-      setTotal(data.total || 0);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, page]);
-
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -83,27 +74,19 @@ export default function Orders() {
 
   const open = (o: Order) => {
     setSelected(o); setEditStatus(o.status); setStaffNote(o.staff_note || "");
-    // Par défaut on autorise l'édition ; le banner ré-évalue selon le claim.
     setCanEdit(true);
     setShow(true);
   };
 
   const updateStatus = async () => {
     if (!selected) return;
-    if (!canEdit) {
-      toast.error("Commande verrouillée par un autre admin");
-      return;
-    }
-    setUpdating(true);
+    if (!canEdit) { toast.error("Commande verrouillée par un autre admin"); return; }
     try {
-      await updateOrderStatus(selected.id, { status: editStatus, staff_note: staffNote });
+      await updateStatusMutation.mutateAsync({ id: selected.id, payload: { status: editStatus, staff_note: staffNote } });
       toast.success("Statut mis à jour");
       setShow(false);
-      fetchOrders();
     } catch {
       toast.error("Erreur");
-    } finally {
-      setUpdating(false);
     }
   };
 
@@ -130,7 +113,6 @@ export default function Orders() {
 
       <DataCard>
         <DataCardHeader>
-          {/* Mobile: Select; Desktop: chips */}
           <div className="sm:hidden w-full">
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
               <SelectTrigger className="rounded-none border-2 mono text-xs h-9 w-full"><SelectValue /></SelectTrigger>
@@ -185,9 +167,7 @@ export default function Orders() {
                     <p className="text-[10px] mono text-muted-foreground truncate">{o.user_email}</p>
                     <p className="text-[10px] mono text-muted-foreground sm:hidden mt-0.5">{fmtDate(o.created_at)}</p>
                   </div>
-
                   <div className="hidden md:block mono text-[10px] text-muted-foreground shrink-0">{fmtDate(o.created_at)}</div>
-
                   <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0 flex-wrap justify-end">
                     <div className="mono text-sm font-bold whitespace-nowrap">{fmt(o.total_price)}</div>
                     <StatusBadge status={o.status} />
@@ -239,8 +219,8 @@ export default function Orders() {
                       {editStatuses.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Button onClick={updateStatus} disabled={updating || !canEdit} className="rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider text-xs">
-                    {updating ? "..." : "OK"}
+                  <Button onClick={updateStatus} disabled={updateStatusMutation.isPending || !canEdit} className="rounded-none border-2 border-primary bg-primary text-primary-foreground mono uppercase tracking-wider text-xs">
+                    {updateStatusMutation.isPending ? "..." : "OK"}
                   </Button>
                 </div>
                 <div>

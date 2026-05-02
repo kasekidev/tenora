@@ -1,15 +1,17 @@
 // ─── Tenora Service Worker ───────────────────────────────────────────────────
 // Strategy:
-//   • Shell assets  → Cache-first (versioned, busted on deploy)
-//   • PWA meta files → Network-first, fallback to cache
-//   • Navigate      → Network-first, fallback to cached page then /
-//   • Static assets → Stale-While-Revalidate (serve fast, update in bg)
-//   • API / external → Never cached (pass-through)
+//   • Shell assets     → Cache-first (versioned, busted on deploy)
+//   • PWA meta files   → Network-first, fallback to cache
+//   • Navigate         → Network-first, fallback to cached page then /
+//   • Static assets    → Stale-While-Revalidate (serve fast, update in bg)
+//   • /uploads/*       → Stale-While-Revalidate, cache long (images produits)
+//   • API / external   → Never cached (pass-through)
 
-const VERSION = "tenora-v3";
-const CACHE_SHELL = `${VERSION}-shell`;
-const CACHE_PAGES = `${VERSION}-pages`;
+const VERSION = "tenora-v4";
+const CACHE_SHELL  = `${VERSION}-shell`;
+const CACHE_PAGES  = `${VERSION}-pages`;
 const CACHE_ASSETS = `${VERSION}-assets`;
+const CACHE_IMAGES = `${VERSION}-images`;   // cache dédié images produits
 
 const SHELL_ASSETS = [
   "/",
@@ -36,13 +38,12 @@ self.addEventListener("install", (event) => {
         })
       )
   );
-  // Take over immediately without waiting for old SW to finish
   self.skipWaiting();
 });
 
 // ─── Activate ────────────────────────────────────────────────────────────────
 self.addEventListener("activate", (event) => {
-  const validCaches = new Set([CACHE_SHELL, CACHE_PAGES, CACHE_ASSETS]);
+  const validCaches = new Set([CACHE_SHELL, CACHE_PAGES, CACHE_ASSETS, CACHE_IMAGES]);
 
   event.waitUntil(
     caches
@@ -139,13 +140,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Static assets — stale-while-revalidate for speed + freshness
+  // 3. Images produits & catégories (/uploads/*) — stale-while-revalidate
+  //    Servi instantanément depuis le cache, mis à jour en arrière-plan.
+  //    Impact fort en zone réseau lente (Niamey) : -100% de req au 2e chargement.
+  if (url.pathname.startsWith("/uploads/")) {
+    event.respondWith(staleWhileRevalidate(req, CACHE_IMAGES));
+    return;
+  }
+
+  // 4. Static assets (JS/CSS/fonts/icons) — stale-while-revalidate
   if (/\.(?:png|jpg|jpeg|svg|webp|ico|gif|woff2?|ttf|otf|css|js|mjs|json)$/.test(url.pathname)) {
     event.respondWith(staleWhileRevalidate(req, CACHE_ASSETS));
     return;
   }
 
-  // 4. Everything else — pass through (API calls, etc.)
+  // 5. Everything else — pass through (API calls, etc.)
 });
 
 // ─── Message handling (e.g. from app: force update) ──────────────────────────

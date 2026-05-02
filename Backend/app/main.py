@@ -27,8 +27,6 @@ from app.services.rate_limiter import limiter
 from app.services.scheduler import start_scheduler
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
-# 12-factor : en prod on n'écrit QUE sur stdout (capture par Docker / Railway).
-# Le fichier rotatif n'est utile qu'en dev local.
 logger.remove()
 logger.add(sys.stdout, level="DEBUG" if settings.DEBUG else "INFO")
 if settings.DEBUG:
@@ -75,7 +73,6 @@ app.state.limiter = limiter
 
 
 async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    """Handler stable — évite l'import du symbole privé `_rate_limit_exceeded_handler`."""
     return JSONResponse(
         status_code=429,
         content={"detail": f"Trop de requêtes. Limite : {exc.detail}"},
@@ -85,10 +82,6 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONR
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 
-# ── Static uploads avec cache navigateur 24 h ────────────────────────────────
-# Les images de produits/catégories sont quasi-immuables → on laisse le navigateur
-# les garder. Quand on remplace une image, l'URL change (nouveau path) donc pas
-# de problème de stale-cache.
 class CachedStaticFiles(StaticFiles):
     async def get_response(self, path, scope):
         response = await super().get_response(path, scope)
@@ -100,7 +93,6 @@ class CachedStaticFiles(StaticFiles):
 app.mount("/uploads", CachedStaticFiles(directory=settings.UPLOAD_FOLDER), name="uploads")
 
 
-# ─── Handler 500 — masque les détails en prod ─────────────────────────────────
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.exception(f"Unhandled exception | {request.method} {request.url.path}")
@@ -112,7 +104,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-# ── Handler 422 — masque les détails Pydantic en prod ─────────────────────────
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     if settings.DEBUG:
@@ -132,6 +123,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def security_headers(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
+
+    # Ignorer les preflight OPTIONS : pas de headers sécurité ni de log perf
+    # (4.4 — ne pas polluer les logs avec les requêtes OPTIONS du navigateur)
+    if request.method == "OPTIONS":
+        return response
+
     process_time = time.time() - start_time
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
@@ -141,14 +138,11 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Process-Time"] = f"{process_time:.4f}"
     if not settings.DEBUG:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    # log lent (>1s)
     if process_time > 1.0:
         logger.warning(f"SLOW {request.method} {request.url.path} | {process_time:.2f}s")
     return response
 
 
-# ── GZip — compresse toutes les réponses JSON > 500 octets ───────────────────
-# Gain typique sur les listes (orders, products) : -75% de payload réseau.
 app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY, https_only=not settings.DEBUG, same_site="lax")
@@ -179,15 +173,12 @@ async def sitemap():
 
 @app.get("/health", include_in_schema=False)
 async def health_check():
-    """Liveness probe — n'interroge PAS la DB pour rester rapide & stable."""
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
 
 @app.get("/health/db", include_in_schema=False)
 async def health_db():
-    """Readiness probe — vérifie la connexion DB."""
     from sqlalchemy import text
-
     from app.database import SessionLocal
     try:
         db = SessionLocal()

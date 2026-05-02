@@ -1,6 +1,8 @@
+import hashlib
+import json
 import time
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import and_
 from sqlalchemy.orm import Session, joinedload
 
@@ -35,6 +37,18 @@ def _cache_invalidate(key: str):
     _CACHE.pop(key, None)
 
 
+def _etag(data: dict) -> str:
+    """ETag léger basé sur le contenu JSON sérialisé."""
+    return hashlib.md5(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
+def _set_cache_headers(response: Response, data: dict, max_age: int = 300) -> None:
+    """Applique Cache-Control + ETag sur la réponse."""
+    tag = _etag(data)
+    response.headers["Cache-Control"] = f"public, max-age={max_age}, stale-while-revalidate={max_age * 2}"
+    response.headers["ETag"] = f'"{tag}"'
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _build_site_data(db: Session) -> dict:
@@ -44,10 +58,8 @@ def _build_site_data(db: Session) -> dict:
     payment_methods = get_setting(db, "payment_methods", DEFAULT_PAYMENT_METHODS)
     featured_ids    = get_setting(db, "featured_product_ids", [])
 
-    # Ne retourner que les méthodes actives au frontend
     active_methods = [m for m in payment_methods if m.get("enabled", True)]
 
-    # Sécurise le typage (toujours une liste d'int)
     if not isinstance(featured_ids, list):
         featured_ids = []
     featured_ids = [
@@ -71,55 +83,59 @@ def _base_url(request: Request) -> str:
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get("/init")
-def site_init(db: Session = Depends(get_db)):
+def site_init(response: Response, db: Session = Depends(get_db)):
     """
     ✅ ENDPOINT UNIFIÉ — remplace :
         GET /site/settings
         GET /orders/payment-methods
     Le frontend n'a plus besoin que d'UN seul appel au démarrage.
-    Résultat mis en cache 5 min pour éviter les hits DB répétés.
+    Résultat mis en cache 5 min (serveur) + Cache-Control 5 min (navigateur).
+    Le navigateur renvoie If-None-Match → 304 Not Modified au lieu du payload complet.
     """
     cached = _cache_get("site_init")
     if cached is not None:
+        _set_cache_headers(response, cached)
         return cached
 
     data = _build_site_data(db)
     _cache_set("site_init", data)
+    _set_cache_headers(response, data)
     return data
 
 
 @router.get("/settings")
-def public_settings(db: Session = Depends(get_db)):
+def public_settings(response: Response, db: Session = Depends(get_db)):
     """
     Rétro-compatibilité — utilise le même cache que /init.
     Retourne maintenance + announcement uniquement (sans payment_methods).
     """
     cached = _cache_get("site_init")
     if cached is not None:
-        return {
-            "maintenance":  cached["maintenance"],
-            "announcement": cached["announcement"],
-        }
+        partial = {"maintenance": cached["maintenance"], "announcement": cached["announcement"]}
+        _set_cache_headers(response, partial)
+        return partial
 
     maintenance  = get_setting(db, "maintenance_mode", False)
     announcement = get_setting(db, "announcement", DEFAULT_ANNOUNCEMENT)
 
-    return {
+    partial = {
         "maintenance":  bool(maintenance),
         "announcement": announcement if isinstance(announcement, dict) else DEFAULT_ANNOUNCEMENT,
     }
+    _set_cache_headers(response, partial)
+    return partial
 
 
 @router.get("/home")
-def site_home(request: Request, db: Session = Depends(get_db)):
+def site_home(request: Request, response: Response, db: Session = Depends(get_db)):
     """
     Endpoint optimisé pour la page d'accueil :
     settings publics + produits "featured" résolus, en une seule réponse.
-    Élimine la cascade Home côté frontend (plus besoin de useQuery imbriqué).
-    Mis en cache 5 min comme /init.
+    Cache serveur 5 min + Cache-Control navigateur (304 possible).
     """
     cached = _cache_get("site_home")
     if cached is not None:
+        _set_cache_headers(response, cached)
         return cached
 
     base = _build_site_data(db)
@@ -130,12 +146,11 @@ def site_home(request: Request, db: Session = Depends(get_db)):
     if featured_ids:
         rows = (
             db.query(Product)
-            .options(joinedload(Product.category))  # pour le fallback image catégorie
+            .options(joinedload(Product.category))
             .filter(and_(Product.id.in_(featured_ids), Product.is_active == True))
             .all()
         )
         by_id = {p.id: p for p in rows}
-        # Respect de l'ordre choisi dans l'admin, limité à 8
         ordered = [by_id[i] for i in featured_ids if i in by_id][:8]
         products = [
             ProductResponse.from_orm_with_url(
@@ -152,14 +167,11 @@ def site_home(request: Request, db: Session = Depends(get_db)):
 
     payload = {**base, "featured_products": products}
     _cache_set("site_home", payload)
+    _set_cache_headers(response, payload)
     return payload
 
 
-# ── Exposition de l'invalidation du cache (à appeler depuis le panel) ────────
-# Dans panel.py, après chaque POST sur /panel/settings/*, appeler :
-#   from app.routes.site import invalidate_site_cache
-#   invalidate_site_cache()
-
+# ── Exposition de l'invalidation du cache ────────────────────────────────────
 def invalidate_site_cache():
     """Invalide le cache dès qu'un paramètre est modifié via le panel admin."""
     _cache_invalidate("site_init")

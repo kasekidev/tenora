@@ -70,7 +70,6 @@ def register(data: UserRegister, response: Response, request: Request, db: Sessi
         logger.warning(f"Inscription échouée | email déjà utilisé | email={data.email}")
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé.")
 
-    # Si pseudo fourni, vérifier l'unicité (case-insensitive).
     if data.username and _username_taken(db, data.username):
         raise HTTPException(status_code=400, detail="Ce pseudo est déjà pris.")
 
@@ -106,7 +105,7 @@ def register(data: UserRegister, response: Response, request: Request, db: Sessi
         key      = "session_id",
         value    = session_id,
         httponly = True,
-        secure   = True,
+        secure   = not is_dev,                      # False en dev (HTTP), True en prod (HTTPS)
         samesite = "lax" if is_dev else "none",
         max_age  = cookie_max_age,
     )
@@ -152,7 +151,7 @@ def login(data: UserLogin, response: Response, request: Request, db: Session = D
         key      = "session_id",
         value    = session_id,
         httponly = True,
-        secure   = True,
+        secure   = not is_dev,                      # False en dev (HTTP), True en prod (HTTPS)
         samesite = "lax" if is_dev else "none",
         max_age  = cookie_max_age,
     )
@@ -177,8 +176,8 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
     response.delete_cookie(
         key      = "session_id",
-        secure   = True,
-        samesite = "none",
+        secure   = not is_dev,                      # Doit correspondre aux flags du set_cookie
+        samesite = "lax" if is_dev else "none",
         httponly = True,
     )
     return {"message": "Déconnecté"}
@@ -282,7 +281,6 @@ def update_profile(
         user.phone = data.phone
         changed = True
 
-    # Pseudo : autorisé UNIQUEMENT si jamais défini auparavant.
     if data.username is not None:
         if user.username:
             raise HTTPException(
