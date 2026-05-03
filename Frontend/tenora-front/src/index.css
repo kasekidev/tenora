@@ -84,77 +84,81 @@
   }
 
   /* =========================================================
-     TENORA — Thème Clair : Pétrole + Ambre
-     Fond bleu acier ~#607f96 · Accent ambre #d48820 · Texte quasi-noir
-     Activé via html.light (toggle + localStorage)
-     CONTRASTE : muted-foreground à 9% L → ratio 4.8:1 sur bg (WCAG AA ✓)
+     TENORA — Thème Clair : Pétrole lumineux + Ambre
+     Surfaces pétrole clair (jamais blanc), texte encre profonde, accents ambre
+     Esprit affiche risographie · DNA brutalist conservé
      ========================================================= */
   html.light {
-    /* Background légèrement plus clair (48% vs 40%) = plus de marge pour le texte */
-    --background: 200 22% 48%;           /* ~#607f96 */
-    --foreground: 200 60% 5%;            /* #071421 quasi-noir */
+    /* Surfaces — pétrole clair lumineux, légèrement désaturé pour le confort */
+    --background: 198 32% 78%;           /* pétrole pâle vivant */
+    --foreground: 200 75% 8%;            /* encre pétrole quasi-noir */
 
-    --card: 200 22% 40%;                 /* #4e7080 — clairement plus sombre que bg */
-    --card-foreground: 200 60% 5%;
+    --card: 198 30% 84%;                 /* carte plus claire que bg = relief */
+    --card-foreground: 200 75% 8%;
 
-    --popover: 200 22% 40%;
-    --popover-foreground: 200 60% 5%;
+    --popover: 198 30% 86%;
+    --popover-foreground: 200 75% 8%;
 
-    --muted: 200 22% 33%;                /* zones déprimées */
-    --muted-foreground: 200 50% 9%;      /* #0b2033 — très sombre = lisible partout */
+    --muted: 198 28% 72%;                /* zones déprimées */
+    --muted-foreground: 200 55% 18%;     /* lisible (>7:1 sur bg) */
 
-    --surface-elev: 200 22% 43%;
-    --surface-elev-2: 200 22% 36%;
+    --surface-elev: 198 30% 82%;
+    --surface-elev-2: 198 28% 76%;
 
-    /* Accent unique : ambre chaud */
-    --primary: 38 74% 48%;               /* #d48820 */
-    --primary-foreground: 200 60% 5%;
-    --primary-glow: 38 80% 58%;
+    /* Brand — Ambre brûlé, peps sans flash */
+    --primary: 28 90% 42%;               /* #d3690c ambre brûlé profond */
+    --primary-foreground: 198 32% 96%;
+    --primary-glow: 32 92% 56%;
 
-    --secondary: 200 60% 5%;
-    --secondary-foreground: 200 22% 88%;
+    /* Secondary — Pétrole encre */
+    --secondary: 200 75% 12%;            /* #08283a */
+    --secondary-foreground: 198 32% 92%;
 
-    --accent: 200 22% 56%;               /* pétrole clair pour chips/badges */
-    --accent-foreground: 200 60% 5%;
+    /* Accent — Sarcelle vif (fun) */
+    --accent: 188 78% 28%;               /* #10727f */
+    --accent-foreground: 198 32% 96%;
 
-    --whatsapp: 142 70% 38%;
+    --whatsapp: 142 65% 28%;
     --whatsapp-foreground: 0 0% 100%;
 
-    --warning: 38 74% 48%;
-    --warning-foreground: 200 60% 5%;
+    --warning: 32 92% 38%;
+    --warning-foreground: 198 32% 96%;
 
-    --destructive: 0 70% 40%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 358 70% 38%;
+    --destructive-foreground: 198 32% 96%;
 
-    --success: 158 55% 35%;
-    --success-foreground: 0 0% 98%;
+    --success: 158 75% 22%;
+    --success-foreground: 198 32% 96%;
 
-    --border: 200 55% 8%;                /* #0b2030 — trait net, DNA brutalist */
-    --input: 200 22% 45%;                /* légèrement plus clair que card = champ visible */
-    --ring: 38 74% 48%;
+    --border: 200 75% 8%;                /* trait encre net */
+    --input: 198 28% 74%;
+    --ring: 28 90% 42%;
 
-    /* Gradients — sobres */
-    --gradient-primary: linear-gradient(90deg, hsl(38 74% 48%), hsl(38 60% 62%));
-    --gradient-accent: linear-gradient(90deg, hsl(200 60% 5%), hsl(200 22% 40%));
-    --gradient-hero: linear-gradient(180deg, hsl(200 22% 48%), hsl(200 22% 42%));
-    --gradient-card: linear-gradient(180deg, hsl(200 22% 41%), hsl(200 22% 37%));
+    /* Gradients — pétrole + ambre, vivants */
+    --gradient-primary: linear-gradient(90deg, hsl(28 90% 42%), hsl(38 92% 58%));
+    --gradient-accent: linear-gradient(90deg, hsl(200 75% 12%), hsl(188 78% 28%));
+    --gradient-hero:
+      radial-gradient(800px 400px at 90% 0%, hsl(28 90% 50% / 0.18), transparent 60%),
+      radial-gradient(700px 500px at 0% 100%, hsl(188 78% 35% / 0.20), transparent 55%),
+      linear-gradient(180deg, hsl(198 32% 80%), hsl(198 30% 74%));
+    --gradient-card: linear-gradient(180deg, hsl(198 30% 86%), hsl(198 28% 80%));
 
-    /* Shadows — offset ambre brutal */
-    --shadow-glow: 0 0 20px -5px hsl(38 74% 48% / 0.45);
-    --shadow-magenta: 0 0 20px -6px hsl(38 74% 48% / 0.3);
-    --shadow-cyan: 0 0 20px -6px hsl(200 30% 78% / 0.25);
-    --shadow-card: 0 8px 0 0 hsl(200 55% 8%);
-    --shadow-soft: 0 1px 0 hsl(0 0% 0% / 0.1) inset;
+    /* Shadows — encre brutale */
+    --shadow-glow: 0 0 24px -6px hsl(28 90% 42% / 0.55);
+    --shadow-magenta: 0 0 22px -6px hsl(358 70% 42% / 0.40);
+    --shadow-cyan: 0 0 22px -6px hsl(188 78% 28% / 0.45);
+    --shadow-card: 6px 6px 0 0 hsl(200 75% 8%);
+    --shadow-soft: 0 1px 0 hsl(0 0% 100% / 0.25) inset;
 
-    /* Sidebar — tout le texte en quasi-noir, lisible */
-    --sidebar-background: 200 22% 38%;
-    --sidebar-foreground: 200 60% 5%;
-    --sidebar-primary: 38 74% 48%;
-    --sidebar-primary-foreground: 200 60% 5%;
-    --sidebar-accent: 200 22% 32%;
-    --sidebar-accent-foreground: 200 50% 9%;
-    --sidebar-border: 200 55% 8%;
-    --sidebar-ring: 38 74% 48%;
+    /* Sidebar — pétrole un cran plus dense */
+    --sidebar-background: 198 32% 74%;
+    --sidebar-foreground: 200 75% 8%;
+    --sidebar-primary: 28 90% 42%;
+    --sidebar-primary-foreground: 198 32% 96%;
+    --sidebar-accent: 198 28% 68%;
+    --sidebar-accent-foreground: 200 75% 8%;
+    --sidebar-border: 200 75% 8%;
+    --sidebar-ring: 28 90% 42%;
   }
 }
 
@@ -173,10 +177,39 @@
     background-attachment: fixed;
     overscroll-behavior-y: none;
   }
-  /* Supprime les halos néon en mode clair */
+  /* Halos sarcelle + ambre subtils sur fond pétrole */
   html.light body {
-    background-image: none;
+    background-image:
+      radial-gradient(900px 500px at 100% 0%, hsl(28 90% 50% / 0.18), transparent 60%),
+      radial-gradient(700px 500px at 0% 100%, hsl(188 78% 35% / 0.18), transparent 55%);
   }
+  html.light .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(200 75% 8% / 0.10) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(200 75% 8% / 0.10) 1px, transparent 1px);
+  }
+  /* Chips colorés : aplats francs */
+  html.light .chip[class*="bg-warning/"] { background: hsl(var(--warning)); color: hsl(var(--warning-foreground)); border-color: hsl(var(--border)); }
+  html.light .chip[class*="bg-success/"] { background: hsl(var(--success)); color: hsl(var(--success-foreground)); border-color: hsl(var(--border)); }
+  html.light .chip[class*="bg-destructive/"] { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); border-color: hsl(var(--border)); }
+  html.light .chip[class*="bg-secondary/"] { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); border-color: hsl(var(--border)); }
+  html.light .chip[class*="bg-primary/"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: hsl(var(--border)); }
+  /* Status pills (Orders) : tintes pétrole pâles + bordure encre */
+  html.light span[class*="bg-warning/10"][class*="text-warning"] { background: hsl(32 88% 78%); color: hsl(28 92% 18%); border-color: hsl(var(--border)) !important; }
+  html.light span[class*="bg-success/10"][class*="text-success"] { background: hsl(158 50% 72%); color: hsl(158 80% 14%); border-color: hsl(var(--border)) !important; }
+  html.light span[class*="bg-destructive/10"][class*="text-destructive"] { background: hsl(358 70% 80%); color: hsl(358 80% 28%); border-color: hsl(var(--border)) !important; }
+  html.light span[class*="bg-secondary/10"][class*="text-secondary"] { background: hsl(198 50% 76%); color: hsl(200 75% 10%); border-color: hsl(var(--border)) !important; }
+  html.light span[class*="bg-muted"][class*="text-muted-foreground"] { background: hsl(198 28% 70%); border-color: hsl(var(--border)) !important; }
+  /* Renforce le texte coloré sur fond crème */
+  html.light .text-warning { color: hsl(28 92% 28%); }
+  html.light .text-success { color: hsl(158 75% 22%); }
+  html.light .text-destructive { color: hsl(358 75% 34%); }
+  html.light .text-secondary { color: hsl(198 70% 18%); }
+  html.light .text-amber-500 { color: hsl(28 92% 32%); }
+  /* Cartes brutalist : ombre encre pleine, plus impactante en clair */
+  html.light .brut-card:hover { box-shadow: 6px 6px 0 0 hsl(var(--border)); border-color: hsl(var(--border)); }
+  /* Fond marquee/announcement bar : noir encre pour démarquer */
+  html.light .bg-foreground { background: hsl(var(--foreground)); }
   h1,h2,h3,h4 {
     font-family: 'Teko', 'Space Grotesk', sans-serif;
     letter-spacing: -0.01em;

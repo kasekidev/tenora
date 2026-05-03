@@ -115,21 +115,23 @@ export function Navbar() {
             </SheetTrigger>
             <SheetContent side="right" className="w-[88%] max-w-sm p-0 bg-sidebar border-l-2 border-sidebar-border">
               <SheetTitle className="sr-only">Menu de navigation</SheetTitle>
-              <div className="flex items-center justify-between p-4 border-b-2 border-sidebar-border">
+              <div className="flex items-center justify-between p-4 pr-14 border-b-2 border-sidebar-border">
                 <TenoraLogo className="text-xl" />
-                {/* Toggle mobile dans le menu latéral */}
+              </div>
+              {/* Toggle thème — rangée dédiée pour ne pas se confondre avec la croix de fermeture */}
+              <div className="px-3 pt-3">
                 <button
                   onClick={toggle}
-                  aria-label={isLight ? "Mode sombre" : "Mode clair"}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 border-2 text-[10px] font-bold uppercase tracking-widest font-mono transition-colors",
-                    isLight
-                      ? "border-amber-400/60 text-amber-500"
-                      : "border-primary/60 text-primary"
-                  )}
+                  aria-label={isLight ? "Passer en mode sombre" : "Passer en mode clair"}
+                  className="w-full inline-flex items-center justify-between gap-2 px-3 py-2.5 border-2 border-sidebar-border text-[11px] font-bold uppercase tracking-widest font-mono transition-colors hover:bg-sidebar-accent"
                 >
-                  {isLight ? <Sun className="size-3" /> : <Moon className="size-3" />}
-                  {isLight ? "Clair" : "Sombre"}
+                  <span className="flex items-center gap-2">
+                    {isLight ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                    Thème · {isLight ? "Clair" : "Sombre"}
+                  </span>
+                  <span className="px-2 py-0.5 border-2 border-primary text-primary text-[9px]">
+                    Basculer
+                  </span>
                 </button>
               </div>
               <div className="p-3 space-y-1">
