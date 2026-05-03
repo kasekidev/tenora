@@ -46,11 +46,20 @@ export default function Register() {
   };
 
   return (
-    <div className="container-app py-10 md:py-16 flex items-center justify-center min-h-[70vh]">
-      <div className="w-full max-w-md card-elev p-6 md:p-8">
-        <div className="flex flex-col items-center text-center mb-6">
-          <TenoraLogo className="size-12 mb-3" />
-          <h1 className="font-display text-2xl font-bold">Créer un compte</h1>
+    <div className="relative min-h-[80vh] flex items-center justify-center py-10 md:py-16 overflow-hidden">
+      {/* Grille d'arrière-plan */}
+      <div className="absolute inset-0 bg-grid opacity-[0.07] pointer-events-none" aria-hidden />
+      {/* Halos ambiants */}
+      <div className="absolute -top-16 left-[-8%] w-[26rem] h-[26rem] rounded-full bg-primary/8 blur-[80px] pointer-events-none" aria-hidden />
+      <div className="absolute bottom-0 right-[-5%] w-80 h-80 rounded-full bg-primary/6 blur-[70px] pointer-events-none" aria-hidden />
+      {/* Ligne de décoration */}
+      <div className="absolute top-2/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent pointer-events-none" aria-hidden />
+
+      {/* Carte */}
+      <div className="relative z-10 w-full max-w-md mx-4 card-elev p-6 md:p-8">
+        <div className="flex flex-col items-center text-center mb-7">
+          <TenoraLogo className="text-2xl mb-4" />
+          <h1 className="font-display text-2xl font-bold uppercase tracking-tight">Créer un compte</h1>
           <p className="text-sm text-muted-foreground mt-1">Commencez à commander en 30 secondes.</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
@@ -61,8 +70,8 @@ export default function Register() {
           )}
 
           <div>
-            <label htmlFor="register-email" className="text-xs font-medium text-muted-foreground">Email</label>
-            <div className="relative mt-1">
+            <label htmlFor="register-email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email</label>
+            <div className="relative mt-1.5">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <input
                 id="register-email"
@@ -73,16 +82,16 @@ export default function Register() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-11 pl-10 pr-3 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                className="w-full h-11 pl-10 pr-3 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="register-username" className="text-xs font-medium text-muted-foreground">
-              Pseudonyme <span className="text-muted-foreground/70">(optionnel)</span>
+            <label htmlFor="register-username" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Pseudonyme <span className="text-muted-foreground/60 normal-case font-normal tracking-normal">(optionnel)</span>
             </label>
-            <div className="relative mt-1">
+            <div className="relative mt-1.5">
               <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <input
                 id="register-username"
@@ -93,22 +102,22 @@ export default function Register() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="ex: tenora_fan"
                 maxLength={20}
-                className={`w-full h-11 pl-10 pr-3 bg-input border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                className={`w-full h-11 pl-10 pr-3 bg-input border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors ${
                   usernameValid ? "border-border focus:border-primary" : "border-destructive/60 focus:border-destructive"
                 }`}
               />
             </div>
             <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground mt-1.5">
               <Info className="size-3 mt-0.5 shrink-0" />
-              <span>3 à 20 caractères : lettres, chiffres, <code>_</code> ou <code>-</code>. <strong>Définitif une fois enregistré.</strong></span>
+              <span>3–20 caractères : lettres, chiffres, <code>_</code> ou <code>-</code>. <strong>Définitif une fois enregistré.</strong></span>
             </p>
           </div>
 
           <div>
-            <label htmlFor="register-phone" className="text-xs font-medium text-muted-foreground">
-              Téléphone <span className="text-muted-foreground/70">(optionnel)</span>
+            <label htmlFor="register-phone" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Téléphone <span className="text-muted-foreground/60 normal-case font-normal tracking-normal">(optionnel)</span>
             </label>
-            <div className="relative mt-1">
+            <div className="relative mt-1.5">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <input
                 id="register-phone"
@@ -119,14 +128,14 @@ export default function Register() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+227 ..."
-                className="w-full h-11 pl-10 pr-3 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                className="w-full h-11 pl-10 pr-3 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="register-password" className="text-xs font-medium text-muted-foreground">Mot de passe</label>
-            <div className="relative mt-1">
+            <label htmlFor="register-password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mot de passe</label>
+            <div className="relative mt-1.5">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <input
                 id="register-password"
@@ -137,12 +146,12 @@ export default function Register() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-11 pl-10 pr-11 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                className="w-full h-11 pl-10 pr-11 bg-input border border-border text-base focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPwd((v) => !v)}
-                aria-label={showPwd ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-label={showPwd ? "Masquer" : "Afficher"}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5"
                 tabIndex={-1}
               >
@@ -178,11 +187,15 @@ export default function Register() {
             size="lg"
             className="w-full h-12 bg-gradient-primary text-primary-foreground shadow-glow disabled:opacity-50"
           >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />} Créer mon compte
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+            Créer mon compte
           </Button>
         </form>
-        <p className="text-center text-sm text-muted-foreground mt-5">
-          Déjà inscrit ? <Link to="/connexion" className="text-primary font-medium hover:underline">Se connecter</Link>
+        <p className="text-center text-sm text-muted-foreground mt-5 pt-5 border-t border-border">
+          Déjà inscrit ?{" "}
+          <Link to="/connexion" className="text-primary font-bold hover:underline">
+            Se connecter →
+          </Link>
         </p>
       </div>
     </div>
